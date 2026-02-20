@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @map("_id") @db.ObjectId
+  email             String   @unique
+  name              String
+  passwordHash      String
+  passwordVersion   Int      @default(1)
+  roles             String[] @default(["patient"])
+  refreshTokenHash  String?
+  failedLoginCount  Int      @default(0)
+  lastLoginAt       DateTime?
+
+  @@map("users")
+}
