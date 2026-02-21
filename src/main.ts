@@ -34,7 +34,7 @@ async function bootstrap() {
     defaultVersion: '1'
   });
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
-  const port = 8000;
+  const port = parseInt(process.env.PORT ?? '8000', 10);
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('MRS API')
