@@ -11,7 +11,7 @@
     "lint": "eslint \"src/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\"",
     "docs": "node dist/docs/swagger.js",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "npx --no-install prisma generate"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -23,7 +23,7 @@
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/swagger": "^7.3.0",
     "@nestjs/throttler": "^4.2.1",
-    "@prisma/client": "^5.8.1",
+    "@prisma/client": "5.22.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
@@ -43,7 +43,10 @@
     "reflect-metadata": "^0.1.13",
     "swagger-ui-express": "^5.0.0"
   },
-  "overrides": {},
+  "overrides": {
+    "@prisma/client": "5.22.0",
+    "prisma": "5.22.0"
+  },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/compression": "^1.7.5",
@@ -55,7 +58,7 @@
     "@typescript-eslint/parser": "^6.16.0",
     "eslint": "^8.56.0",
     "prettier": "^3.2.5",
-    "prisma": "^5.8.1",
+    "prisma": "5.22.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.4.0"

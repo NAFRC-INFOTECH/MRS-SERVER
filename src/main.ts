@@ -19,8 +19,14 @@ async function bootstrap() {
   app.use(mongoSanitize());
   const configService = app.get(ConfigService);
   const corsOriginRaw = configService.get<string>('CORS_ORIGIN');
-  const corsOrigin = corsOriginRaw ? corsOriginRaw.replace(/\/$/, '') : true;
-  app.enableCors({ origin: corsOrigin, credentials: true });
+  const normalize = (o: string) => o.trim().replace(/\/$/, '');
+  const origin: boolean | string | string[] =
+    corsOriginRaw && corsOriginRaw.includes(',')
+      ? corsOriginRaw.split(',').map((o) => normalize(o))
+      : corsOriginRaw
+      ? normalize(corsOriginRaw)
+      : true;
+  app.enableCors({ origin, credentials: true });
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({
