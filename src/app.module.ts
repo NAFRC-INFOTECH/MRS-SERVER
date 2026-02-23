@@ -15,6 +15,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ProfileModule } from './profile/profile.module';
 import { InvitationsModule } from './invitations/invitations.module';
 import { DoctorProfileModule } from './doctor-profile/doctor-profile.module';
+import { MailerModule } from './mailer/mailer.module';
 // import { AdminModule } from './admin/admin.module';
 
 @Module({
@@ -36,6 +37,17 @@ import { DoctorProfileModule } from './doctor-profile/doctor-profile.module';
         PEPPER_SECRET: Joi.string().required(),
         RATE_LIMIT_TTL: Joi.number().default(60),
         RATE_LIMIT_LIMIT: Joi.number().default(100)
+        ,
+        SMTP_HOST: Joi.string().optional(),
+        SMTP_PORT: Joi.number().optional(),
+        SMTP_SECURE: Joi.boolean().optional(),
+        SMTP_USER: Joi.string().optional(),
+        SMTP_PASS: Joi.string().optional(),
+        MAIL_FROM: Joi.string().optional(),
+        APP_NAME: Joi.string().optional(),
+        FRONTEND_URL: Joi.string().optional(),
+        PUBLIC_API_URL: Joi.string().optional(),
+        PUBLIC_APP_URL: Joi.string().optional()
       })
     }),
     LoggerModule.forRoot({
@@ -74,6 +86,7 @@ import { DoctorProfileModule } from './doctor-profile/doctor-profile.module';
     AuthModule,
     ProfileModule,
     PrismaModule,
+    MailerModule,
     InvitationsModule,
     DoctorProfileModule
   ],

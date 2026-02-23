@@ -14,7 +14,12 @@ import { join } from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
-  app.use(helmet());
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      crossOriginEmbedderPolicy: false
+    })
+  );
   app.use(compression());
   app.use(mongoSanitize());
   const configService = app.get(ConfigService);
@@ -39,7 +44,13 @@ async function bootstrap() {
     type: VersioningType.URI,
     defaultVersion: '1'
   });
-  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads',
+    setHeaders: (res) => {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  });
   const port = parseInt(process.env.PORT ?? '8000', 10);
 
   const swaggerConfig = new DocumentBuilder()
