@@ -14,6 +14,7 @@ import { join } from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
+  const logger = app.get(Logger);
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -65,6 +66,12 @@ async function bootstrap() {
   });
 
   await app.listen(port);
+  process.on('unhandledRejection', (reason: unknown) => {
+    logger.error({ reason }, 'Unhandled Promise Rejection');
+  });
+  process.on('uncaughtException', (err: Error) => {
+    logger.error({ err }, 'Uncaught Exception');
+  });
 }
 
 bootstrap();

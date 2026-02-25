@@ -66,4 +66,16 @@ export class UsersService {
   async clearRefreshToken(userId: string): Promise<void> {
     await this.userModel.findByIdAndUpdate(userId, { $unset: { refreshTokenHash: '' } });
   }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+    const ok = await this.passwordService.verify(currentPassword, user.passwordHash);
+    if (!ok) throw new NotFoundException('Invalid current password');
+    const hash = await this.passwordService.hash(newPassword);
+    user.passwordHash = hash;
+    user.passwordVersion = (user.passwordVersion ?? 1) + 1;
+    user.refreshTokenHash = undefined;
+    await user.save();
+  }
 }

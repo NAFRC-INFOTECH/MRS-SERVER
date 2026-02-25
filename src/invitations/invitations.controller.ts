@@ -5,11 +5,12 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { Role } from '../common/types/roles';
 import { InvitationsService } from './invitations.service';
+import { AcceptInvitationDto } from './invitations.dto';
 
 @ApiTags('invitations')
 @Controller({ path: 'invitations', version: '1' })
 export class InvitationsController {
-  constructor(private readonly invitationsService: InvitationsService) {}
+  constructor(private readonly invitationsService: InvitationsService) { }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -28,7 +29,7 @@ export class InvitationsController {
   }
 
   @Post('accept')
-  async accept(@Body() dto: { token: string; password: string; name?: string }) {
+  async accept(@Body() dto: AcceptInvitationDto) {
     return this.invitationsService.acceptByToken(dto.token, dto.password, dto.name);
   }
 }

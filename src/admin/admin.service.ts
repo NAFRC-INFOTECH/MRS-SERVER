@@ -55,4 +55,16 @@ export class AdminService {
     if (!admin) throw new NotFoundException('Admin not found');
     return admin;
   }
+
+  async changePassword(adminId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const admin = await this.adminModel.findById(adminId);
+    if (!admin) throw new NotFoundException('Admin not found');
+    const ok = await this.passwordService.verify(currentPassword, admin.passwordHash);
+    if (!ok) throw new NotFoundException('Invalid current password');
+    const hash = await this.passwordService.hash(newPassword);
+    admin.passwordHash = hash;
+    admin.passwordVersion = (admin.passwordVersion ?? 1) + 1;
+    admin.refreshTokenHash = undefined;
+    await admin.save();
+  }
 }
