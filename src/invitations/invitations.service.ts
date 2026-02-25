@@ -1,30 +1,40 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Invitation, InvitationDocument, generateInvitationToken } from './invitations.schema';
-import { MailerService } from '../mailer/mailer.service';
+import { AppMailerService } from '../mailer/app-mailer.service';
 import { UsersService } from '../users/users.service';
 import { DoctorProfileService } from '../doctor-profile/doctor-profile.service';
 
 @Injectable()
 export class InvitationsService {
+  private readonly logger = new Logger(InvitationsService.name);
+
   constructor(
     @InjectModel(Invitation.name) private readonly invitationModel: Model<InvitationDocument>,
-    private readonly mailer: MailerService,
+    private readonly mailer: AppMailerService,
     private readonly usersService: UsersService,
     private readonly doctorProfileService: DoctorProfileService
-  ) {}
+  ) { }
 
   async inviteDoctor(email: string, invitedBy?: string): Promise<InvitationDocument> {
+    // Check for existing pending invitation — resend if found
     const existingPending = await this.invitationModel.findOne({ email, role: 'doctor', status: 'pending' });
     if (existingPending) {
-      await this.mailer.sendDoctorInvitation(email, existingPending.token);
+      this.logger.log(`Resending invitation to existing pending invite for ${email}`);
+      const res = await this.mailer.sendDoctorInvitation(email, existingPending.token);
+      if (!res.ok) throw new ServiceUnavailableException(res.error || 'Failed to send invitation email');
       return existingPending;
     }
+
+    // Create new invitation record first
     const token = generateInvitationToken();
+    const res = await this.mailer.sendDoctorInvitation(email, token);
+    if (!res.ok) throw new ServiceUnavailableException(res.error || 'Failed to send invitation email');
     const inv = new this.invitationModel({ email, role: 'doctor', token, status: 'pending', invitedBy });
     const saved = await inv.save();
-    await this.mailer.sendDoctorInvitation(email, token);
+    this.logger.log(`Invitation record created for ${email} (token: ${token.slice(0, 8)}...)`);
+
     return saved;
   }
 

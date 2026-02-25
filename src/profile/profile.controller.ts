@@ -9,6 +9,7 @@ import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import * as fs from 'fs';
 import type { Request } from 'express';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @ApiTags('profile')
 @ApiBearerAuth()
@@ -43,6 +44,15 @@ export class ProfileController {
     delete obj.passwordHash;
     delete obj.refreshTokenHash;
     return obj;
+  }
+
+  @Patch('me/password')
+  async changePassword(@Req() req: { user: { userId: string } }, @Body() dto: ChangePasswordDto) {
+    const id = req.user.userId;
+    const admin = await this.adminService.findById(id);
+    if (admin) await this.adminService.changePassword(id, dto.currentPassword, dto.newPassword);
+    else await this.usersService.changePassword(id, dto.currentPassword, dto.newPassword);
+    return { ok: true };
   }
 
   @Post('me/image')

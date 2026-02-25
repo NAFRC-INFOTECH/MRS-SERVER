@@ -16,6 +16,7 @@ import { ProfileModule } from './profile/profile.module';
 import { InvitationsModule } from './invitations/invitations.module';
 import { DoctorProfileModule } from './doctor-profile/doctor-profile.module';
 import { MailerModule } from './mailer/mailer.module';
+
 // import { AdminModule } from './admin/admin.module';
 
 @Module({
@@ -47,12 +48,15 @@ import { MailerModule } from './mailer/mailer.module';
         APP_NAME: Joi.string().optional(),
         FRONTEND_URL: Joi.string().optional(),
         PUBLIC_API_URL: Joi.string().optional(),
-        PUBLIC_APP_URL: Joi.string().optional()
+        PUBLIC_APP_URL: Joi.string().optional(),
+        RESEND_API_KEY: Joi.string().optional(),
+        USE_ETHEREAL_FALLBACK: Joi.boolean().default(false)
       })
     }),
     LoggerModule.forRoot({
       pinoHttp: {
-        level: process.env.NODE_ENV === 'production' ? 'info' : 'debug'
+        level: 'silent',
+        autoLogging: false
       }
     }),
     MongooseModule.forRootAsync({
