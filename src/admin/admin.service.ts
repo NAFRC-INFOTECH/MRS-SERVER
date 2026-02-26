@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PasswordService } from '../common/security/password';
+import { User, UserDocument } from '../users/schemas/user.schema';
 import { Admin, AdminDocument } from './schemas/admin.schema';
 import { UpdateUserDto } from '../users/dto/update-user.dto';
 
@@ -9,12 +10,15 @@ import { UpdateUserDto } from '../users/dto/update-user.dto';
 export class AdminService {
   constructor(
     @InjectModel(Admin.name) private readonly adminModel: Model<AdminDocument>,
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     private readonly passwordService: PasswordService
   ) {}
 
   async create(dto: { name: string; email: string; password: string }): Promise<AdminDocument> {
-    const exists = await this.adminModel.findOne({ email: dto.email }).lean();
-    if (exists) throw new ConflictException('Email already registered');
+    const existsAdmin = await this.adminModel.findOne({ email: dto.email }).lean();
+    if (existsAdmin) throw new ConflictException('Email already registered');
+    const existsUser = await this.userModel.findOne({ email: dto.email }).lean();
+    if (existsUser) throw new ConflictException('Email already registered');
     const passwordHash = await this.passwordService.hash(dto.password);
     const admin = new this.adminModel({
       email: dto.email,

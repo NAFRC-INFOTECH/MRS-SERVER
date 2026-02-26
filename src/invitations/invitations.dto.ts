@@ -9,6 +9,11 @@ export class InviteDoctorDto {
 }
 
 export class AcceptInvitationDto {
+    @ApiProperty({ example: 'doctor@example.com' })
+    @IsEmail({}, { message: 'Must be a valid email address' })
+    @IsNotEmpty()
+    email: string;
+
     @ApiProperty({ example: 'abc123tokenhere' })
     @IsString()
     @IsNotEmpty()
