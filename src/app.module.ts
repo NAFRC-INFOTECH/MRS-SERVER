@@ -16,6 +16,7 @@ import { ProfileModule } from './profile/profile.module';
 import { InvitationsModule } from './invitations/invitations.module';
 import { DoctorProfileModule } from './doctor-profile/doctor-profile.module';
 import { MailerModule } from './mailer/mailer.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 // import { AdminModule } from './admin/admin.module';
 
@@ -39,11 +40,6 @@ import { MailerModule } from './mailer/mailer.module';
         RATE_LIMIT_TTL: Joi.number().default(60),
         RATE_LIMIT_LIMIT: Joi.number().default(100)
         ,
-        SMTP_HOST: Joi.string().optional(),
-        SMTP_PORT: Joi.number().optional(),
-        SMTP_SECURE: Joi.boolean().optional(),
-        SMTP_USER: Joi.string().optional(),
-        SMTP_PASS: Joi.string().optional(),
         MAIL_FROM: Joi.string().optional(),
         APP_NAME: Joi.string().optional(),
         FRONTEND_URL: Joi.string().optional(),
@@ -91,6 +87,7 @@ import { MailerModule } from './mailer/mailer.module';
     ProfileModule,
     PrismaModule,
     MailerModule,
+    RealtimeModule,
     InvitationsModule,
     DoctorProfileModule
   ],

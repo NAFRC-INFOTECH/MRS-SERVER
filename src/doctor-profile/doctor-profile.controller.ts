@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -50,5 +50,30 @@ export class DoctorProfileController {
   async complete(@Req() req: { user: { userId: string } }) {
     const profile = await this.profileService.completeOnboarding(req.user.userId);
     return profile;
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role)
+  @Patch(':userId/status')
+  async updateStatus(@Param('userId') userId: string, @Body() body: { status: string }) {
+    const profile = await this.profileService.updateStatus(userId, body.status);
+    return profile;
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role)
+  @Delete(':userId')
+  async remove(@Param('userId') userId: string) {
+    return this.profileService.deleteByUserId(userId);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role)
+  @Patch(':userId/reset-password')
+  async resetPassword(@Param('userId') userId: string) {
+    return this.profileService.resetPassword(userId);
   }
 }

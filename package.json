@@ -44,7 +44,10 @@
     "pino-pretty": "^11.2.2",
     "reflect-metadata": "^0.1.13",
     "swagger-ui-express": "^5.0.0",
-    "handlebars": "^4.7.8"
+    "handlebars": "^4.7.8",
+    "@nestjs/websockets": "^10.0.0",
+    "@nestjs/platform-socket.io": "^10.0.0",
+    "socket.io": "^4.7.5"
   },
   "overrides": {
     "@prisma/client": "5.22.0",

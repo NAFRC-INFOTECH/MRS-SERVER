@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Body, UseGuards, Query, Delete } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -13,6 +13,19 @@ import { AssignRolesDto } from './dto/assign-roles.dto';
 @Controller({ path: 'users', version: '1' })
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role)
+  @Get()
+  async listByRole(@Query('role') role?: string) {
+    const list = role ? await this.usersService.findByRole(role) : await this.usersService.findAll();
+    return list.map((u) => {
+      const obj: any = { ...u };
+      delete obj.passwordHash;
+      delete obj.refreshTokenHash;
+      return obj;
+    });
+  }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('super_admin' as Role)
@@ -46,5 +59,24 @@ export class UsersController {
     delete obj.passwordHash;
     delete obj.refreshTokenHash;
     return obj;
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role)
+  @Patch(':id/suspend')
+  async suspend(@Param('id') id: string, @Body() body: { suspended: boolean }) {
+    const user = await this.usersService.suspend(id, !!body.suspended);
+    const obj = user.toObject();
+    delete obj.passwordHash;
+    delete obj.refreshTokenHash;
+    return obj;
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role)
+  @Delete(':id')
+  async remove(@Param('id') id: string) {
+    await this.usersService.remove(id);
+    return { ok: true };
   }
 }

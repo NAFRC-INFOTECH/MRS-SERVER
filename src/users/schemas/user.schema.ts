@@ -46,6 +46,9 @@ export class User {
 
   @Prop()
   lastLoginAt?: Date;
+
+  @Prop({ default: false })
+  suspended: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

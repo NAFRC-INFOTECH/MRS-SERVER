@@ -46,22 +46,41 @@ export class AuthService {
   }
 
   async validateUser(email: string, password: string) {
+    const e = (email || '').trim().toLowerCase();
     const admin = await this.adminService.findByEmail(email);
     if (admin) {
       const ok = await this.adminService.validatePassword(admin, password);
       if (!ok) throw new UnauthorizedException('Invalid credentials');
       return { doc: admin, isAdmin: true };
     }
-    const user = await this.usersService.findByEmail(email);
-    if (!user) throw new UnauthorizedException('Invalid credentials');
-    const ok = await this.usersService.validatePassword(user, password);
-    if (!ok) throw new UnauthorizedException('Invalid credentials');
-    return { doc: user, isAdmin: false };
+    const user = await this.usersService.findByEmail(e);
+    if (user) {
+      const ok = await this.usersService.validatePassword(user, password);
+      if (!ok) throw new UnauthorizedException('Invalid credentials');
+      return { doc: user, isAdmin: false, isDoctorProfile: false as const };
+    }
+    const doctor = await this.doctorProfileService.findByEmail(e).catch(() => null);
+    if (doctor) {
+      const ok = await this.doctorProfileService.validatePassword(doctor, password);
+      if (!ok) throw new UnauthorizedException('Invalid credentials');
+      return { doc: doctor, isAdmin: false, isDoctorProfile: true as const };
+    }
+    throw new UnauthorizedException('Invalid credentials');
   }
 
   async login(email: string, password: string) {
-    const { doc, isAdmin } = await this.validateUser(email, password);
-    const tokens = await this.issueTokens(doc.id, doc.email, doc.roles, doc.passwordVersion);
+    const res = await this.validateUser(email, password);
+    if ((res as any).isDoctorProfile) {
+      const profileDoc: any = (res as any).doc;
+      const roles = ['doctor'];
+      const tokens = await this.issueTokens(profileDoc.userId, profileDoc.personalInfo.email, roles, profileDoc.passwordVersion ?? 1);
+      const refreshTokenHash = await this.passwordService.hash(tokens.refreshToken);
+      await this.doctorProfileService.setRefreshToken(profileDoc.userId, refreshTokenHash);
+      return tokens;
+    }
+    const { doc, isAdmin } = res as any;
+    let roles = Array.isArray(doc.roles) ? [...doc.roles] : [];
+    const tokens = await this.issueTokens(doc.id, doc.email, roles, doc.passwordVersion);
     const refreshTokenHash = await this.passwordService.hash(tokens.refreshToken);
     if (isAdmin) await this.adminService.setRefreshToken(doc.id, refreshTokenHash);
     else await this.usersService.setRefreshToken(doc.id, refreshTokenHash);
@@ -79,12 +98,21 @@ export class AuthService {
       return tokens;
     }
     const user = await this.usersService.findById(userId);
-    if (!user || !user.refreshTokenHash) throw new UnauthorizedException('Invalid token');
-    const ok = await this.passwordService.verify(providedToken, user.refreshTokenHash);
-    if (!ok) throw new UnauthorizedException('Invalid token');
-    const tokens = await this.issueTokens(user.id, user.email, user.roles, user.passwordVersion);
+    if (user && user.refreshTokenHash) {
+      const ok = await this.passwordService.verify(providedToken, user.refreshTokenHash);
+      if (!ok) throw new UnauthorizedException('Invalid token');
+      const tokens = await this.issueTokens(user.id, user.email, user.roles, user.passwordVersion);
+      const refreshTokenHash = await this.passwordService.hash(tokens.refreshToken);
+      await this.usersService.setRefreshToken(user.id, refreshTokenHash);
+      return tokens;
+    }
+    const doctor = await this.doctorProfileService.findByUserId(userId).catch(() => null);
+    if (!doctor || !doctor.refreshTokenHash) throw new UnauthorizedException('Invalid token');
+    const okDoc = await this.passwordService.verify(providedToken, doctor.refreshTokenHash);
+    if (!okDoc) throw new UnauthorizedException('Invalid token');
+    const tokens = await this.issueTokens(doctor.userId, doctor.personalInfo.email, ['doctor'], doctor.passwordVersion ?? 1);
     const refreshTokenHash = await this.passwordService.hash(tokens.refreshToken);
-    await this.usersService.setRefreshToken(user.id, refreshTokenHash);
+    await this.doctorProfileService.setRefreshToken(doctor.userId, refreshTokenHash);
     return tokens;
   }
 
@@ -93,7 +121,12 @@ export class AuthService {
     if (admin) {
       await this.adminService.clearRefreshToken(userId);
     } else {
-      await this.usersService.clearRefreshToken(userId);
+      const user = await this.usersService.findById(userId);
+      if (user) {
+        await this.usersService.clearRefreshToken(userId);
+      } else {
+        await this.doctorProfileService.clearRefreshToken(userId);
+      }
     }
     return { ok: true };
   }

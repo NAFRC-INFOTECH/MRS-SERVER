@@ -21,6 +21,33 @@ export class InvitationsController {
     return { token: doc.token, email: doc.email, role: doc.role, status: doc.status };
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role)
+  @Post('doctor/direct')
+  async createDoctorDirect(@Body() dto: { name: string; email: string }) {
+    const res = await this.invitationsService.createDoctorDirect(dto.name, dto.email);
+    return res; // { id, email, name, password }
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role)
+  @Post('nurse')
+  async inviteNurse(@Req() req: { user: { userId: string } }, @Body() dto: { email: string }) {
+    const inv = await this.invitationsService.inviteNurse(dto.email, req.user?.userId);
+    return { token: inv.token, email: inv.email, role: inv.role, status: inv.status };
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role)
+  @Post('nurse/direct')
+  async createNurseDirect(@Body() dto: { name: string; email: string }) {
+    const res = await this.invitationsService.createNurseDirect(dto.name, dto.email);
+    return res; // { id, email, name, password }
+  }
+
   @Get(':token')
   async verifyInvitation(@Param('token') token: string) {
     const inv = await this.invitationsService.findByToken(token);
@@ -30,6 +57,6 @@ export class InvitationsController {
 
   @Post('accept')
   async accept(@Body() dto: AcceptInvitationDto) {
-    return this.invitationsService.acceptByToken(dto.token, dto.password, dto.name);
+    return this.invitationsService.acceptByToken(dto.token, dto.email, dto.password, dto.name);
   }
 }

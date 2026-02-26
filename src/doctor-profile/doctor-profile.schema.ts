@@ -102,6 +102,15 @@ export class DoctorProfile {
   @Prop({ required: true, unique: true, index: true })
   userId: string;
 
+  @Prop()
+  passwordHash?: string;
+
+  @Prop({ default: 1 })
+  passwordVersion?: number;
+
+  @Prop()
+  refreshTokenHash?: string;
+
   @Prop({ type: PersonalInfo, required: true })
   personalInfo: PersonalInfo;
 
