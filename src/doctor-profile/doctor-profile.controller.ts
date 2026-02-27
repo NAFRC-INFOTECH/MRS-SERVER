@@ -6,6 +6,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import type { Role } from '../common/types/roles';
 import { DoctorProfileService } from './doctor-profile.service';
 import { DoctorProfile } from './doctor-profile.schema';
+import { UsersService } from '../users/users.service';
 
 type DeepPartial<T> = {
   [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
@@ -14,7 +15,10 @@ type DeepPartial<T> = {
 @ApiTags('doctor-profiles')
 @Controller({ path: 'doctor-profiles', version: '1' })
 export class DoctorProfileController {
-  constructor(private readonly profileService: DoctorProfileService) {}
+  constructor(
+    private readonly profileService: DoctorProfileService,
+    private readonly usersService: UsersService
+  ) {}
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -23,6 +27,56 @@ export class DoctorProfileController {
   async listAll() {
     const list = await this.profileService.listAll();
     return list.map((p) => p);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role)
+  @Get(':userId')
+  async getByUserId(@Param('userId') userId: string) {
+    try {
+      const profile = await this.profileService.findByUserId(userId);
+      return profile;
+    } catch {
+      const user = await this.usersService.findById(userId);
+      if (!user) return null;
+      const u: any = user.toObject ? user.toObject() : user;
+      return {
+        userId: u.id || String(u._id || ''),
+        personalInfo: {
+          id: u.id || String(u._id || ''),
+          fullName: u.name || '',
+          dateOfBirth: '',
+          gender: '',
+          nationality: u.country || '',
+          state: u.state || '',
+          phone: u.phone || '',
+          email: u.email || '',
+          address: u.address || '',
+          idDocument: '',
+          emergencyContact: u.emergencyPhone || '',
+          imageUrl: u.imageUrl || '',
+          hospital: u.doctor?.hospital || '',
+          status: u.doctor?.status || 'pending',
+        },
+        qualifications: {
+          medicalDegree: u.doctor?.qualifications?.medicalDegree || '',
+          specialization: u.doctor?.qualifications?.specialization || '',
+          licenses: u.doctor?.qualifications?.licenses || '',
+          boardCertifications: u.doctor?.qualifications?.boardCertifications || '',
+          additionalCertifications: u.doctor?.qualifications?.additionalCertifications || '',
+          medicalSchool: u.doctor?.qualifications?.medicalSchool || '',
+          graduationYear: u.doctor?.qualifications?.graduationYear || '',
+        },
+        experience: { employers: '', jobTitles: '', responsibilities: '', references: '', specializedExperience: '' },
+        cme: { workshops: '', research: '', fellowships: '' },
+        skills: { clinicalSkills: '', surgicalExperience: '', equipment: '', leadership: '' },
+        health: { medicalHistory: '', vaccinations: '', screenings: '' },
+        legal: { licenseProof: '', backgroundCheck: '', insurance: '' },
+        statement: { motivation: '', careerGoals: '', hospitalReason: '' },
+        documents: { cv: '', photo: '', contract: '', availability: '' },
+      } as any;
+    }
   }
 
   @ApiBearerAuth()

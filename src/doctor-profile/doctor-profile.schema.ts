@@ -16,6 +16,8 @@ class PersonalInfo {
   @Prop({ default: '' })
   nationality: string;
   @Prop({ default: '' })
+  state: string;
+  @Prop({ default: '' })
   phone: string;
   @Prop({ default: '' })
   email: string;

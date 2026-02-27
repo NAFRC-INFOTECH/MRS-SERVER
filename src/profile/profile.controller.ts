@@ -10,6 +10,7 @@ import { extname, join } from 'path';
 import * as fs from 'fs';
 import type { Request } from 'express';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { DoctorProfileService } from '../doctor-profile/doctor-profile.service';
 
 @ApiTags('profile')
 @ApiBearerAuth()
@@ -18,32 +19,105 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 export class ProfileController {
   constructor(
     private readonly adminService: AdminService,
-    private readonly usersService: UsersService
+    private readonly usersService: UsersService,
+    private readonly doctorProfileService: DoctorProfileService
   ) {}
 
   @Get('me')
   async me(@Req() req: { user: { userId: string } }) {
     const id = req.user.userId;
     const admin = await this.adminService.findById(id);
-    const doc = admin ?? (await this.usersService.findById(id));
-    if (!doc) return null;
-    const obj = doc.toObject();
-    delete obj.passwordHash;
-    delete obj.refreshTokenHash;
-    return obj;
+    if (admin) {
+      const obj = admin.toObject();
+      return {
+        id: String(obj._id),
+        email: obj.email,
+        name: obj.name,
+        imageUrl: obj.imageUrl,
+        phone: obj.phone,
+        address: obj.address,
+        country: obj.country,
+        state: obj.state,
+        emergencyPhone: obj.emergencyPhone,
+        roles: obj.roles,
+      };
+    }
+    const user = await this.usersService.findById(id);
+    if (user) {
+      const obj = user.toObject();
+      return {
+        id: String(obj._id),
+        email: obj.email,
+        name: obj.name,
+        imageUrl: obj.imageUrl,
+        phone: obj.phone,
+        address: obj.address,
+        country: obj.country,
+        state: obj.state,
+        emergencyPhone: obj.emergencyPhone,
+        roles: obj.roles,
+      };
+    }
+    try {
+      const profile = await this.doctorProfileService.findByUserId(id);
+      return {
+        id,
+        name: profile.personalInfo.fullName,
+        email: profile.personalInfo.email,
+        imageUrl: profile.personalInfo.imageUrl,
+        phone: profile.personalInfo.phone,
+        address: profile.personalInfo.address,
+        country: profile.personalInfo.nationality,
+        state: profile.personalInfo.state || '',
+        emergencyPhone: profile.personalInfo.emergencyContact,
+        roles: ['doctor'],
+      };
+    } catch {
+      return null;
+    }
   }
 
   @Patch('me')
   async updateMe(@Req() req: { user: { userId: string } }, @Body() dto: UpdateUserDto) {
     const id = req.user.userId;
     const admin = await this.adminService.findById(id);
-    const updated = admin
-      ? await this.adminService.update(id, dto)
-      : await this.usersService.update(id, dto);
-    const obj = updated.toObject();
-    delete obj.passwordHash;
-    delete obj.refreshTokenHash;
-    return obj;
+    if (admin) {
+      const updated = await this.adminService.update(id, dto);
+      const obj = updated.toObject();
+      delete (obj as any).passwordHash;
+      delete (obj as any).refreshTokenHash;
+      return obj;
+    }
+    const user = await this.usersService.findById(id);
+    if (user) {
+      const updated = await this.usersService.update(id, dto);
+      const obj = updated.toObject();
+      delete (obj as any).passwordHash;
+      delete (obj as any).refreshTokenHash;
+      return obj;
+    }
+    // Fallback to doctor profile update
+    const patch: any = {};
+    if (dto.name !== undefined) patch['personalInfo.fullName'] = dto.name;
+    if (dto.email !== undefined) patch['personalInfo.email'] = dto.email?.toLowerCase();
+    if (dto.imageUrl !== undefined) patch['personalInfo.imageUrl'] = dto.imageUrl;
+    if (dto.phone !== undefined) patch['personalInfo.phone'] = dto.phone;
+    if (dto.address !== undefined) patch['personalInfo.address'] = dto.address;
+    if (dto.country !== undefined) patch['personalInfo.nationality'] = dto.country;
+    if (dto.state !== undefined) patch['personalInfo.state'] = dto.state; 
+    if (dto.emergencyPhone !== undefined) patch['personalInfo.emergencyContact'] = dto.emergencyPhone;
+    
+    const profile = await this.doctorProfileService.updateForUser(id, patch);
+    return {
+      name: profile.personalInfo.fullName,
+      email: profile.personalInfo.email,
+      imageUrl: profile.personalInfo.imageUrl,
+      phone: profile.personalInfo.phone,
+      address: profile.personalInfo.address,
+      country: profile.personalInfo.nationality,
+      state: profile.personalInfo.state || '',
+      emergencyPhone: profile.personalInfo.emergencyContact
+    };
   }
 
   @Patch('me/password')
@@ -51,7 +125,11 @@ export class ProfileController {
     const id = req.user.userId;
     const admin = await this.adminService.findById(id);
     if (admin) await this.adminService.changePassword(id, dto.currentPassword, dto.newPassword);
-    else await this.usersService.changePassword(id, dto.currentPassword, dto.newPassword);
+    else {
+      const user = await this.usersService.findById(id);
+      if (user) await this.usersService.changePassword(id, dto.currentPassword, dto.newPassword);
+      else await this.doctorProfileService.changePassword(id, dto.currentPassword, dto.newPassword);
+    }
     return { ok: true };
   }
 
@@ -84,12 +162,16 @@ export class ProfileController {
     const base = `${req.protocol}://${req.get('host')}`;
     const imageUrl = `${base}/uploads/avatars/${file.filename}`;
     const admin = await this.adminService.findById(id);
-    const updated = admin
-      ? await this.adminService.update(id, { imageUrl })
-      : await this.usersService.update(id, { imageUrl });
-    const obj = updated.toObject();
-    delete obj.passwordHash;
-    delete obj.refreshTokenHash;
+    if (admin) {
+      await this.adminService.update(id, { imageUrl });
+      return { imageUrl };
+    }
+    const user = await this.usersService.findById(id);
+    if (user) {
+      await this.usersService.update(id, { imageUrl });
+      return { imageUrl };
+    }
+    await this.doctorProfileService.updateForUser(id, { 'personalInfo.imageUrl': imageUrl });
     return { imageUrl };
   }
 }
