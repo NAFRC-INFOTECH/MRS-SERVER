@@ -47,7 +47,7 @@ export class AuthService {
 
   async validateUser(email: string, password: string) {
     const e = (email || '').trim().toLowerCase();
-    const admin = await this.adminService.findByEmail(email);
+    const admin = await this.adminService.findByEmail(e);
     if (admin) {
       const ok = await this.adminService.validatePassword(admin, password);
       if (!ok) throw new UnauthorizedException('Invalid credentials');
@@ -59,27 +59,21 @@ export class AuthService {
       if (!ok) throw new UnauthorizedException('Invalid credentials');
       return { doc: user, isAdmin: false, isDoctorProfile: false as const };
     }
+    // Fallback for legacy doctor_profiles: migrate to Users and proceed
     const doctor = await this.doctorProfileService.findByEmail(e).catch(() => null);
     if (doctor) {
       const ok = await this.doctorProfileService.validatePassword(doctor, password);
       if (!ok) throw new UnauthorizedException('Invalid credentials');
-      return { doc: doctor, isAdmin: false, isDoctorProfile: true as const };
+      const migrated = await this.usersService.upsertFromDoctorProfile(doctor);
+      return { doc: migrated, isAdmin: false, isDoctorProfile: false as const };
     }
     throw new UnauthorizedException('Invalid credentials');
   }
 
   async login(email: string, password: string) {
     const res = await this.validateUser(email, password);
-    if ((res as any).isDoctorProfile) {
-      const profileDoc: any = (res as any).doc;
-      const roles = ['doctor'];
-      const tokens = await this.issueTokens(profileDoc.userId, profileDoc.personalInfo.email, roles, profileDoc.passwordVersion ?? 1);
-      const refreshTokenHash = await this.passwordService.hash(tokens.refreshToken);
-      await this.doctorProfileService.setRefreshToken(profileDoc.userId, refreshTokenHash);
-      return tokens;
-    }
     const { doc, isAdmin } = res as any;
-    let roles = Array.isArray(doc.roles) ? [...doc.roles] : [];
+    const roles = Array.isArray(doc.roles) ? [...doc.roles] : [];
     const tokens = await this.issueTokens(doc.id, doc.email, roles, doc.passwordVersion);
     const refreshTokenHash = await this.passwordService.hash(tokens.refreshToken);
     if (isAdmin) await this.adminService.setRefreshToken(doc.id, refreshTokenHash);
@@ -97,7 +91,7 @@ export class AuthService {
       await this.adminService.setRefreshToken(admin.id, refreshTokenHash);
       return tokens;
     }
-    const user = await this.usersService.findById(userId);
+    let user = await this.usersService.findById(userId);
     if (user && user.refreshTokenHash) {
       const ok = await this.passwordService.verify(providedToken, user.refreshTokenHash);
       if (!ok) throw new UnauthorizedException('Invalid token');
@@ -106,13 +100,15 @@ export class AuthService {
       await this.usersService.setRefreshToken(user.id, refreshTokenHash);
       return tokens;
     }
+    // Legacy doctor token path: migrate and issue as User
     const doctor = await this.doctorProfileService.findByUserId(userId).catch(() => null);
     if (!doctor || !doctor.refreshTokenHash) throw new UnauthorizedException('Invalid token');
-    const okDoc = await this.passwordService.verify(providedToken, doctor.refreshTokenHash);
+    const migrated = await this.usersService.upsertFromDoctorProfile(doctor);
+    const okDoc = await this.passwordService.verify(providedToken, migrated.refreshTokenHash || '');
     if (!okDoc) throw new UnauthorizedException('Invalid token');
-    const tokens = await this.issueTokens(doctor.userId, doctor.personalInfo.email, ['doctor'], doctor.passwordVersion ?? 1);
+    const tokens = await this.issueTokens(migrated.id, migrated.email, migrated.roles, migrated.passwordVersion);
     const refreshTokenHash = await this.passwordService.hash(tokens.refreshToken);
-    await this.doctorProfileService.setRefreshToken(doctor.userId, refreshTokenHash);
+    await this.usersService.setRefreshToken(migrated.id, refreshTokenHash);
     return tokens;
   }
 
@@ -122,11 +118,8 @@ export class AuthService {
       await this.adminService.clearRefreshToken(userId);
     } else {
       const user = await this.usersService.findById(userId);
-      if (user) {
-        await this.usersService.clearRefreshToken(userId);
-      } else {
-        await this.doctorProfileService.clearRefreshToken(userId);
-      }
+      if (user) await this.usersService.clearRefreshToken(userId);
+      else await this.doctorProfileService.clearRefreshToken(userId);
     }
     return { ok: true };
   }

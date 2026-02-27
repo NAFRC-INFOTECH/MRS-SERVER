@@ -78,6 +78,18 @@ export class DoctorProfileService {
     await this.profileModel.findOneAndUpdate({ userId }, { $unset: { refreshTokenHash: '' } });
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const profile = await this.profileModel.findOne({ userId });
+    if (!profile) throw new NotFoundException('Profile not found');
+    const ok = await this.validatePassword(profile, currentPassword);
+    if (!ok) throw new NotFoundException('Invalid current password');
+    const hash = await this.passwordService.hash(newPassword);
+    profile.passwordHash = hash;
+    profile.passwordVersion = (profile.passwordVersion ?? 1) + 1;
+    profile.refreshTokenHash = undefined;
+    await profile.save();
+  }
+
   async resetPassword(userId: string): Promise<{ password: string }> {
     const pass = this.generateRandomPassword();
     const hash = await this.passwordService.hash(pass);
@@ -104,8 +116,8 @@ export class DoctorProfileService {
     return profile;
   }
 
-  async updateForUser(userId: string, patch: DeepPartial<DoctorProfile>): Promise<DoctorProfileDocument> {
-    const profile = await this.profileModel.findOneAndUpdate({ userId }, patch, { new: true });
+  async updateForUser(userId: string, patch: Record<string, any>): Promise<DoctorProfileDocument> {
+    const profile = await this.profileModel.findOneAndUpdate({ userId }, { $set: patch }, { new: true });
     if (!profile) throw new NotFoundException('Profile not found');
     return profile;
   }

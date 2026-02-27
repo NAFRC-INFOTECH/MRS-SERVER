@@ -34,4 +34,33 @@ export class UsersRolesMaintenanceController {
       }
       return { ok: true, normalized: updated };
     }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('super_admin' as Role)
+    @Post('migrate/doctor-profiles-to-users')
+    async migrateDoctorProfilesToUsers() {
+      const profiles = await this.doctorProfileService.listAll();
+      let migrated = 0;
+      for (const p of profiles) {
+        await this.usersService.upsertFromDoctorProfile(p);
+        migrated++;
+      }
+      return { ok: true, migrated };
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('super_admin' as Role)
+    @Post('roles/remove-patient')
+    async removePatientRoleFromAll() {
+      const all = await this.usersService.findAll();
+      let updated = 0;
+      for (const u of all) {
+        const roles = (u.roles || []).filter((r) => r !== 'patient');
+        if (roles.length !== (u.roles || []).length) {
+          await this.usersService.assignRoles(String((u as any)._id), roles);
+          updated++;
+        }
+      }
+      return { ok: true, updated };
+    }
 }

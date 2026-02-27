@@ -3,6 +3,24 @@ import { Document } from 'mongoose';
 
 export type UserDocument = User & Document;
 
+@Schema({ _id: false })
+class DoctorQualifications {
+  @Prop({ default: '' }) medicalDegree: string;
+  @Prop({ default: '' }) specialization: string;
+  @Prop({ default: '' }) licenses: string;
+  @Prop({ default: '' }) boardCertifications: string;
+  @Prop({ default: '' }) additionalCertifications: string;
+  @Prop({ default: '' }) medicalSchool: string;
+  @Prop({ default: '' }) graduationYear: string;
+}
+
+@Schema({ _id: false })
+class DoctorMeta {
+  @Prop({ default: 'pending' }) status: string;
+  @Prop({ default: '' }) hospital: string;
+  @Prop({ type: DoctorQualifications, default: {} }) qualifications: DoctorQualifications;
+}
+
 @Schema({ timestamps: true })
 export class User {
   @Prop({ required: true, unique: true, lowercase: true, trim: true, index: true })
@@ -35,7 +53,7 @@ export class User {
   @Prop({ default: 1 })
   passwordVersion: number;
 
-  @Prop({ type: [String], default: ['patient'] })
+  @Prop({ type: [String], default: [] })
   roles: string[];
 
   @Prop()
@@ -49,6 +67,9 @@ export class User {
 
   @Prop({ default: false })
   suspended: boolean;
+
+  @Prop({ type: DoctorMeta, required: false })
+  doctor?: DoctorMeta;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

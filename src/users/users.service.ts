@@ -68,8 +68,8 @@ export class UsersService {
   }
 
   async assignRoles(id: string, roles: string[]): Promise<UserDocument> {
-    const sanitized = roles.filter((r) => r !== 'doctor');
-    const user = await this.userModel.findByIdAndUpdate(id, { roles: sanitized }, { new: true });
+    const unique = Array.from(new Set(roles));
+    const user = await this.userModel.findByIdAndUpdate(id, { roles: unique }, { new: true });
     if (!user) throw new NotFoundException('User not found');
     this.rt.emit('user.updated', { id: user.id, roles });
     return user;
@@ -110,5 +110,91 @@ export class UsersService {
     user.passwordVersion = (user.passwordVersion ?? 1) + 1;
     user.refreshTokenHash = undefined;
     await user.save();
+  }
+
+  async updateDoctorStatus(userId: string, status: string): Promise<UserDocument> {
+    const user = await this.userModel.findByIdAndUpdate(userId, { 'doctor.status': status }, { new: true });
+    if (!user) throw new NotFoundException('User not found');
+    this.rt.emit('user.updated', { id: user.id, status });
+    return user;
+  }
+
+  async resetPassword(userId: string): Promise<{ password: string }> {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&';
+    const len = 14;
+    let out = '';
+    for (let i = 0; i < len; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+    const hash = await this.passwordService.hash(out);
+    user.passwordHash = hash;
+    user.passwordVersion = (user.passwordVersion ?? 1) + 1;
+    user.refreshTokenHash = undefined;
+    await user.save();
+    return { password: out };
+  }
+
+  async upsertFromDoctorProfile(profile: any): Promise<UserDocument> {
+    const email = (profile?.personalInfo?.email || '').trim().toLowerCase();
+    if (!email) throw new NotFoundException('Doctor email missing');
+    let user = await this.userModel.findOne({ email });
+    const base: Partial<User> = {
+      email,
+      name: profile?.personalInfo?.fullName || '',
+      imageUrl: profile?.personalInfo?.imageUrl || '',
+      phone: profile?.personalInfo?.phone || '',
+      address: profile?.personalInfo?.address || '',
+      country: profile?.personalInfo?.nationality || '',
+      state: profile?.personalInfo?.state || '',
+      emergencyPhone: profile?.personalInfo?.emergencyContact || '',
+    } as any;
+    const doctorMeta: any = {
+      status: profile?.personalInfo?.status || 'pending',
+      hospital: profile?.personalInfo?.hospital || '',
+      qualifications: {
+        medicalDegree: profile?.qualifications?.medicalDegree || '',
+        specialization: profile?.qualifications?.specialization || '',
+        licenses: profile?.qualifications?.licenses || '',
+        boardCertifications: profile?.qualifications?.boardCertifications || '',
+        additionalCertifications: profile?.qualifications?.additionalCertifications || '',
+        medicalSchool: profile?.qualifications?.medicalSchool || '',
+        graduationYear: profile?.qualifications?.graduationYear || '',
+      },
+    };
+    if (user) {
+      user.name = base.name!;
+      user.imageUrl = base.imageUrl;
+      user.phone = base.phone;
+      user.address = base.address;
+      user.country = base.country;
+      user.state = base.state;
+      user.emergencyPhone = base.emergencyPhone;
+      const roles = new Set(user.roles || []);
+      roles.add('doctor');
+      user.roles = Array.from(roles);
+      (user as any).doctor = doctorMeta;
+      if (profile?.passwordHash) {
+        user.passwordHash = profile.passwordHash;
+        user.passwordVersion = profile.passwordVersion ?? user.passwordVersion ?? 1;
+      }
+      if (profile?.refreshTokenHash) {
+        user.refreshTokenHash = profile.refreshTokenHash;
+      }
+      await user.save();
+      this.rt.emit('user.updated', { id: user.id });
+      return user;
+    }
+    // create new user
+    user = new this.userModel({
+      ...base,
+      roles: ['doctor'],
+      passwordHash: profile?.passwordHash ?? (await this.passwordService.hash('TempPass#12345')),
+      passwordVersion: profile?.passwordVersion ?? 1,
+      refreshTokenHash: profile?.refreshTokenHash,
+      doctor: doctorMeta,
+    });
+    const saved = await user.save();
+    this.rt.emit('user.updated', { id: saved.id });
+    return saved;
   }
 }

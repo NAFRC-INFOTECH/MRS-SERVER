@@ -71,14 +71,22 @@ export class InvitationsService {
 
   async createDoctorDirect(name: string, email: string) {
     const password = this.generateRandomPassword();
-    const profile = await this.doctorProfileService.createWithAuth(name, email, password);
-    return { id: profile.userId, email, name, password };
+    const user = await this.usersService.create({ name, email, password });
+    await this.usersService.assignRoles(user.id, [...(user.roles || []), 'doctor']);
+    return { id: user.id, email: user.email, name: user.name, password };
   }
 
   async createNurseDirect(name: string, email: string) {
     const password = this.generateRandomPassword();
     const user = await this.usersService.create({ name, email, password });
     await this.usersService.assignRoles(user.id, ['nurse']);
+    return { id: user.id, email: user.email, name: user.name, password };
+  }
+
+  async createRecordingDirect(name: string, email: string) {
+    const password = this.generateRandomPassword();
+    const user = await this.usersService.create({ name, email, password });
+    await this.usersService.assignRoles(user.id, ['recording']);
     return { id: user.id, email: user.email, name: user.name, password };
   }
 
@@ -107,12 +115,13 @@ export class InvitationsService {
     if (inv.email.toLowerCase() !== email.toLowerCase()) {
       throw new BadRequestException('Email does not match this invitation');
     }
-    const profile = await this.doctorProfileService.createWithAuth(name || inv.email.split('@')[0], inv.email, password);
+    const user = await this.usersService.create({ name: name || inv.email.split('@')[0], email: inv.email, password });
+    await this.usersService.assignRoles(user.id, [...(user.roles || []), 'doctor']);
     inv.status = 'accepted';
     inv.acceptedAt = new Date();
     await inv.save();
-    await this.mailer.sendDoctorWelcome(profile.personalInfo.email, profile.personalInfo.fullName);
-    this.rt.emitToRole('super_admin', 'invitation.accepted', { email: profile.personalInfo.email, role: inv.role });
+    await this.mailer.sendDoctorWelcome(user.email, user.name);
+    this.rt.emitToRole('super_admin', 'invitation.accepted', { email: user.email, role: inv.role });
     return { ok: true };
   }
 }

@@ -48,6 +48,15 @@ export class InvitationsController {
     return res; // { id, email, name, password }
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role)
+  @Post('recording/direct')
+  async createRecordingDirect(@Body() dto: { name: string; email: string }) {
+    const res = await this.invitationsService.createRecordingDirect(dto.name, dto.email);
+    return res; // { id, email, name, password }
+  }
+
   @Get(':token')
   async verifyInvitation(@Param('token') token: string) {
     const inv = await this.invitationsService.findByToken(token);
