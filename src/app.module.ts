@@ -17,6 +17,7 @@ import { InvitationsModule } from './invitations/invitations.module';
 import { DoctorProfileModule } from './doctor-profile/doctor-profile.module';
 import { MailerModule } from './mailer/mailer.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { PatientsModule } from './patients/patients.module';
 
 // import { AdminModule } from './admin/admin.module';
 
@@ -89,7 +90,8 @@ import { RealtimeModule } from './realtime/realtime.module';
     MailerModule,
     RealtimeModule,
     InvitationsModule,
-    DoctorProfileModule
+    DoctorProfileModule,
+    PatientsModule
   ],
   providers: [
     {
