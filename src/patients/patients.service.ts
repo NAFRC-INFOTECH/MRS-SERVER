@@ -2,10 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Patient, PatientDocument } from './patient.schema';
+import { GopdQueueService } from '../gopd/gopd-queue.service';
 
 @Injectable()
 export class PatientsService {
-  constructor(@InjectModel(Patient.name) private readonly model: Model<PatientDocument>) {}
+  constructor(
+    @InjectModel(Patient.name) private readonly model: Model<PatientDocument>,
+    private readonly gopdQueue: GopdQueueService
+  ) {}
 
   async list(search?: string): Promise<PatientDocument[]> {
     const q: any = {};
@@ -28,6 +32,10 @@ export class PatientsService {
   async update(id: string, patch: Partial<Patient>): Promise<PatientDocument> {
     const doc = await this.model.findByIdAndUpdate(id, patch, { new: true });
     if (!doc) throw new NotFoundException('Patient not found');
+    const inQueue = await this.gopdQueue.exists(String(doc._id));
+    if (doc.patientQueue === 'godp_vitals' || inQueue) {
+      await this.gopdQueue.ensureFromPatient(doc);
+    }
     return doc;
   }
 
