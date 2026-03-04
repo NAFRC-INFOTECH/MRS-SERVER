@@ -43,8 +43,8 @@ export class InvitationsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('super_admin' as Role)
   @Post('nurse/direct')
-  async createNurseDirect(@Body() dto: { name: string; email: string }) {
-    const res = await this.invitationsService.createNurseDirect(dto.name, dto.email);
+  async createNurseDirect(@Body() dto: { name: string; email: string; department?: string }) {
+    const res = await this.invitationsService.createNurseDirect(dto.name, dto.email, dto.department);
     return res; // { id, email, name, password }
   }
 

@@ -71,21 +71,21 @@ export class InvitationsService {
 
   async createDoctorDirect(name: string, email: string) {
     const password = this.generateRandomPassword();
-    const user = await this.usersService.create({ name, email, password });
+    const user = await this.usersService.create({ name, email, password } as any);
     await this.usersService.assignRoles(user.id, [...(user.roles || []), 'doctor']);
     return { id: user.id, email: user.email, name: user.name, password };
   }
 
-  async createNurseDirect(name: string, email: string) {
+  async createNurseDirect(name: string, email: string, department?: string) {
     const password = this.generateRandomPassword();
-    const user = await this.usersService.create({ name, email, password });
+    const user = await this.usersService.create({ name, email, password, department });
     await this.usersService.assignRoles(user.id, ['nurse']);
     return { id: user.id, email: user.email, name: user.name, password };
   }
 
   async createRecordingDirect(name: string, email: string) {
     const password = this.generateRandomPassword();
-    const user = await this.usersService.create({ name, email, password });
+    const user = await this.usersService.create({ name, email, password } as any);
     await this.usersService.assignRoles(user.id, ['recording']);
     return { id: user.id, email: user.email, name: user.name, password };
   }
@@ -115,13 +115,16 @@ export class InvitationsService {
     if (inv.email.toLowerCase() !== email.toLowerCase()) {
       throw new BadRequestException('Email does not match this invitation');
     }
-    const user = await this.usersService.create({ name: name || inv.email.split('@')[0], email: inv.email, password });
-    await this.usersService.assignRoles(user.id, [...(user.roles || []), 'doctor']);
+    const role = inv.role || 'doctor';
+    const patch: any = { name: name || inv.email.split('@')[0], email: inv.email, password };
+    if (role === 'nurse') patch.department = 'GOPD';
+    const user = await this.usersService.create(patch);
+    await this.usersService.assignRoles(user.id, [...(user.roles || []), role]);
     inv.status = 'accepted';
     inv.acceptedAt = new Date();
     await inv.save();
-    await this.mailer.sendDoctorWelcome(user.email, user.name);
-    this.rt.emitToRole('super_admin', 'invitation.accepted', { email: user.email, role: inv.role });
+    if (role === 'doctor') await this.mailer.sendDoctorWelcome(user.email, user.name);
+    this.rt.emitToRole('super_admin', 'invitation.accepted', { email: user.email, role });
     return { ok: true };
   }
 }

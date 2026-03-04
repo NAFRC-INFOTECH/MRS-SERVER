@@ -83,8 +83,49 @@ export class DoctorProfileController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async me(@Req() req: { user: { userId: string } }) {
-    const profile = await this.profileService.findByUserId(req.user.userId);
-    return profile;
+    try {
+      const profile = await this.profileService.findByUserId(req.user.userId);
+      return profile;
+    } catch {
+      const user = await this.usersService.findById(req.user.userId);
+      if (!user) return null;
+      const u: any = user.toObject ? user.toObject() : user;
+      return {
+        userId: u.id || String(u._id || ''),
+        personalInfo: {
+          id: u.id || String(u._id || ''),
+          fullName: u.name || '',
+          dateOfBirth: '',
+          gender: '',
+          nationality: u.country || '',
+          state: u.state || '',
+          phone: u.phone || '',
+          email: u.email || '',
+          address: u.address || '',
+          idDocument: '',
+          emergencyContact: u.emergencyPhone || '',
+          imageUrl: u.imageUrl || '',
+          hospital: u.doctor?.hospital || '',
+          status: u.doctor?.status || 'pending',
+        },
+        qualifications: {
+          medicalDegree: u.doctor?.qualifications?.medicalDegree || '',
+          specialization: u.doctor?.qualifications?.specialization || '',
+          licenses: u.doctor?.qualifications?.licenses || '',
+          boardCertifications: u.doctor?.qualifications?.boardCertifications || '',
+          additionalCertifications: u.doctor?.qualifications?.additionalCertifications || '',
+          medicalSchool: u.doctor?.qualifications?.medicalSchool || '',
+          graduationYear: u.doctor?.qualifications?.graduationYear || '',
+        },
+        experience: { employers: '', jobTitles: '', responsibilities: '', references: '', specializedExperience: '' },
+        cme: { workshops: '', research: '', fellowships: '' },
+        skills: { clinicalSkills: '', surgicalExperience: '', equipment: '', leadership: '' },
+        health: { medicalHistory: '', vaccinations: '', screenings: '' },
+        legal: { licenseProof: '', backgroundCheck: '', insurance: '' },
+        statement: { motivation: '', careerGoals: '', hospitalReason: '' },
+        documents: { cv: '', photo: '', contract: '', availability: '' },
+      } as any;
+    }
   }
 
   @ApiBearerAuth()

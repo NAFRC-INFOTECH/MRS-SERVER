@@ -45,6 +45,9 @@ export class User {
   state?: string;
 
   @Prop({ trim: true })
+  department?: string;
+
+  @Prop({ trim: true })
   emergencyPhone?: string;
 
   @Prop({ required: true })
