@@ -13,27 +13,30 @@ class NextOfKin {
 
 @Schema({ timestamps: true, collection: 'patients' })
 export class Patient {
-  @Prop({ trim: true }) surname: string;
-  @Prop({ trim: true }) firstname: string;
-  @Prop({ trim: true }) lastname: string;
+  @Prop({ trim: true, required: true }) surname: string;
+  @Prop({ trim: true, required: true }) firstname: string;
+  @Prop({ trim: true }) middlename: string;
   @Prop({ default: false }) veteran: boolean;
-  @Prop({ trim: true }) serviceNumber?: string;
-  @Prop({ trim: true }) rank?: string;
+  @Prop({ trim: true, required: function (this: any) { return !!this.veteran; } }) serviceNumber?: string;
+  @Prop({ trim: true, required: function (this: any) { return !!this.veteran; } }) rank?: string;
+  @Prop({ trim: true, required: function (this: any) { return !this.veteran; } }) membershipNumber?: string;
 
-  @Prop({ trim: true }) sex: string;
-  @Prop() age?: number;
-  @Prop({ trim: true }) dateOfBirth?: string;
+  @Prop({ trim: true, required: true }) sex: string;
+  @Prop({ required: true }) age?: number;
+  @Prop({ trim: true, required: true }) dateOfBirth?: string;
 
-  @Prop({ trim: true }) country?: string;
-  @Prop({ trim: true }) stateOfOrigin?: string;
+  @Prop({ trim: true, required: true }) country?: string;
+  @Prop({ trim: true, required: true }) stateOfOrigin?: string;
   @Prop({ trim: true }) lga?: string;
   @Prop({ trim: true }) address?: string;
   @Prop({ trim: true }) religion?: string;
-  @Prop({ trim: true }) maritalStatus?: string;
-  @Prop({ trim: true }) phone?: string;
+  @Prop({ trim: true, required: true }) maritalStatus?: string;
+  @Prop({ trim: true, required: true }) phone?: string;
   @Prop({ trim: true }) occupation?: string;
   @Prop({ trim: true }) genotype?: string;
   @Prop({ trim: true }) bloodGroup?: string;
+  @Prop({ trim: true, default: 'active' }) patientStatus?: string;
+  @Prop({ trim: true }) patientQueue?: string;
 
   @Prop({ type: NextOfKin }) nok?: NextOfKin;
 }
