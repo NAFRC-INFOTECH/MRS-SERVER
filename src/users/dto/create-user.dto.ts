@@ -15,4 +15,8 @@ export class CreateUserDto {
   @IsString()
   @MinLength(8)
   password: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  department?: string;
 }

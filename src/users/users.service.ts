@@ -27,7 +27,8 @@ export class UsersService {
     const user = new this.userModel({
       email: dto.email,
       name: dto.name,
-      passwordHash
+      passwordHash,
+      department: (dto as any).department
     });
     const saved = await user.save();
     this.rt.emit('user.updated', { id: saved.id });
