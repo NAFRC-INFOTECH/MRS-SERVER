@@ -7,6 +7,7 @@ import { PasswordService } from '../common/security/password';
 import { RegisterDto } from './dto/register.dto';
 import { InvitationsService } from '../invitations/invitations.service';
 import { DoctorProfileService } from '../doctor-profile/doctor-profile.service';
+import { DutiesService } from '../duties/duties.service';
 
 @Injectable()
 export class AuthService {
@@ -17,7 +18,8 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly passwordService: PasswordService,
     private readonly invitationsService: InvitationsService,
-    private readonly doctorProfileService: DoctorProfileService
+    private readonly doctorProfileService: DoctorProfileService,
+    private readonly dutiesService: DutiesService
   ) {}
 
   async register(dto: RegisterDto) {
@@ -74,11 +76,19 @@ export class AuthService {
     const res = await this.validateUser(email, password);
     const { doc, isAdmin } = res as any;
     const roles = Array.isArray(doc.roles) ? [...doc.roles] : [];
+    const role = roles[0];
+    if (!isAdmin && role === 'nurse') {
+      const okDuty = await this.dutiesService.isNurseOnDutyNow(doc.id);
+      if (!okDuty) throw new UnauthorizedException('Nurse not on active duty shift');
+    }
+    if (!isAdmin && role === 'doctor') {
+      const okDuty = await this.dutiesService.isDoctorOnDutyNow(doc.id);
+      if (!okDuty) throw new UnauthorizedException('Doctor not on active duty shift');
+    }
     const tokens = await this.issueTokens(doc.id, doc.email, roles, doc.passwordVersion, (doc as any).department);
     const refreshTokenHash = await this.passwordService.hash(tokens.refreshToken);
     if (isAdmin) await this.adminService.setRefreshToken(doc.id, refreshTokenHash);
     else await this.usersService.setRefreshToken(doc.id, refreshTokenHash);
-    const role = roles[0];
     const department = role === 'nurse' ? (doc as any).department : undefined;
     return { ...tokens, department, role };
   }

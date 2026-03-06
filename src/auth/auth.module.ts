@@ -10,6 +10,7 @@ import { SignupGuard } from './guards/signup.guard';
 import { AdminModule } from '../admin/admin.module';
 import { InvitationsModule } from '../invitations/invitations.module';
 import { DoctorProfileModule } from '../doctor-profile/doctor-profile.module';
+import { DutiesModule } from '../duties/duties.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { DoctorProfileModule } from '../doctor-profile/doctor-profile.module';
     AdminModule,
     InvitationsModule,
     DoctorProfileModule,
+    DutiesModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (config: ConfigService) => ({
