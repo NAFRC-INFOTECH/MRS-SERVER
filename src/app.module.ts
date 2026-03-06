@@ -20,6 +20,9 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { PatientsModule } from './patients/patients.module';
 import { GopdModule } from './gopd/gopd.module';
 import { DepartmentsModule } from './departments/departments.module';
+import { DutiesModule } from './duties/duties.module';
+import { NursesModule } from './nurses/nurses.module';
+import { DoctorsModule } from './doctors/doctors.module';
 
 // import { AdminModule } from './admin/admin.module';
 
@@ -95,7 +98,10 @@ import { DepartmentsModule } from './departments/departments.module';
     DoctorProfileModule,
     PatientsModule,
     GopdModule,
-    DepartmentsModule
+    DepartmentsModule,
+    DutiesModule,
+    NursesModule,
+    DoctorsModule
   ],
   providers: [
     {
