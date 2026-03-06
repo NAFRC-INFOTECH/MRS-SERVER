@@ -69,6 +69,31 @@ export class DutiesService {
     const list = await this.dutyModel.find(q).lean();
     return list;
   }
+  async update(id: string, dto: Partial<{ departmentId: string; date: string; shift: Shift; timeIn: string; timeOut: string; status: DutyStatus }>) {
+    const update: any = {};
+    if (dto.departmentId) update.departmentId = dto.departmentId;
+    if (dto.shift) update.shift = dto.shift;
+    if (dto.status) update.status = dto.status;
+    if (dto.date) update.date = new Date(dto.date);
+    if (dto.timeIn) update.timeIn = new Date(dto.timeIn);
+    if (dto.timeOut) update.timeOut = new Date(dto.timeOut);
+    if (update.timeIn && update.timeOut && !(update.timeOut > update.timeIn)) {
+      throw new BadRequestException('timeOut must be later than timeIn');
+    }
+    const doc = await this.dutyModel.findByIdAndUpdate(id, update, { new: true });
+    if (!doc) throw new BadRequestException('Duty not found');
+    if (dto.departmentId && doc.nurseUserId) {
+      const deptList = await this.departmentsService.list();
+      const okDept = deptList.find((d: any) => String(d._id) === String(dto.departmentId));
+      if (okDept) await this.usersService.update(doc.nurseUserId as any, { department: (okDept as any).name } as any);
+    }
+    return doc.toObject();
+  }
+  async remove(id: string) {
+    const res = await this.dutyModel.findByIdAndDelete(id);
+    if (!res) throw new BadRequestException('Duty not found');
+    return { ok: true };
+  }
 
   async isNurseOnDutyNow(nurseUserId: string): Promise<boolean> {
     const now = new Date();
@@ -124,5 +149,9 @@ export class DutiesService {
       status: DutyStatus.ON_DUTY
     }).lean();
     return !!duty;
+  }
+
+  async getById(id: string) {
+    return this.dutyModel.findById(id).lean();
   }
 }
