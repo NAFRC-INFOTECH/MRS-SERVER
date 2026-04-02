@@ -23,6 +23,7 @@ import { DepartmentsModule } from './departments/departments.module';
 import { DutiesModule } from './duties/duties.module';
 import { NursesModule } from './nurses/nurses.module';
 import { DoctorsModule } from './doctors/doctors.module';
+import { LabReferralsModule } from './lab-referrals/lab-referrals.module';
 
 // import { AdminModule } from './admin/admin.module';
 
@@ -101,7 +102,8 @@ import { DoctorsModule } from './doctors/doctors.module';
     DepartmentsModule,
     DutiesModule,
     NursesModule,
-    DoctorsModule
+    DoctorsModule,
+    LabReferralsModule
   ],
   providers: [
     {
