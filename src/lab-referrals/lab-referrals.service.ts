@@ -1,0 +1,96 @@
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { LabReferral, LabReferralDocument, LabReferralStatus } from './lab-referral.schema';
+ 
+type CreateReferralDto = {
+  patientId: string;
+  senderId: string;
+  date: string;
+  serviceNoOrUUID?: string;
+  rank?: string;
+  forenames?: string;
+  surname?: string;
+  wardNo?: string;
+  hospitalUnit?: string;
+  age?: string;
+  to?: string;
+  specimen?: string;
+  examinationRequired?: string;
+  diagnosis?: string;
+  statement?: string;
+  previousReportNos?: string;
+  previousReportDate?: string;
+};
+ 
+@Injectable()
+export class LabReferralsService {
+  constructor(@InjectModel(LabReferral.name) private readonly model: Model<LabReferralDocument>) {}
+ 
+  async create(dto: CreateReferralDto): Promise<LabReferralDocument> {
+    const date = new Date(dto.date || new Date().toISOString());
+    const prevDate = dto.previousReportDate ? new Date(dto.previousReportDate) : undefined;
+    const doc = new this.model({
+      patientId: dto.patientId,
+      senderId: dto.senderId,
+      date,
+      serviceNoOrUUID: dto.serviceNoOrUUID,
+      rank: dto.rank,
+      forenames: dto.forenames,
+      surname: dto.surname,
+      wardNo: dto.wardNo,
+      hospitalUnit: dto.hospitalUnit,
+      age: dto.age,
+      to: dto.to,
+      specimen: dto.specimen,
+      examinationRequired: dto.examinationRequired,
+      diagnosis: dto.diagnosis,
+      statement: dto.statement,
+      previousReportNos: dto.previousReportNos,
+      previousReportDate: prevDate,
+      status: LabReferralStatus.PENDING,
+    });
+    return await doc.save();
+  }
+ 
+  async list(filters: { status?: LabReferralStatus; q?: string; date?: string }): Promise<any[]> {
+    const q: any = {};
+    if (filters.status) q.status = filters.status;
+    if (filters.date) {
+      const d = new Date(filters.date);
+      const next = new Date(d);
+      next.setDate(next.getDate() + 1);
+      q.date = { $gte: d, $lt: next };
+    }
+    const list = await this.model.find(q).sort({ createdAt: -1 }).lean();
+    return list.map((r: any) => ({
+      id: String(r._id),
+      patientId: String(r.patientId),
+      senderId: String(r.senderId),
+      date: r.date,
+      serviceNoOrUUID: r.serviceNoOrUUID,
+      rank: r.rank,
+      forenames: r.forenames,
+      surname: r.surname,
+      wardNo: r.wardNo,
+      hospitalUnit: r.hospitalUnit,
+      age: r.age,
+      to: r.to,
+      specimen: r.specimen,
+      examinationRequired: r.examinationRequired,
+      diagnosis: r.diagnosis,
+      statement: r.statement,
+      previousReportNos: r.previousReportNos,
+      previousReportDate: r.previousReportDate,
+      status: r.status,
+      createdAt: r.createdAt,
+    }));
+  }
+ 
+  async setStatus(id: string, status: LabReferralStatus): Promise<any> {
+    if (!Object.values(LabReferralStatus).includes(status)) throw new BadRequestException('Invalid status');
+    const saved = await this.model.findByIdAndUpdate(id, { status }, { new: true }).lean();
+    if (!saved) throw new BadRequestException('Referral not found');
+    return { id: String(saved._id), status: saved.status };
+  }
+}

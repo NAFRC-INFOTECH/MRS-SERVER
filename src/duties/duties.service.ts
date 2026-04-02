@@ -27,6 +27,7 @@ export class DutiesService {
 
   async create(dto: CreateDutyDto): Promise<DutyRecordDocument> {
     if (!['doctor', 'nurse'].includes(dto.role)) throw new BadRequestException('Invalid role');
+    if (dto.shift === Shift.AFTERNOON) throw new BadRequestException('Afternoon shift is not allowed');
     const user = await this.usersService.findById(dto.staffId);
     if (!user) throw new BadRequestException('Staff not found');
     const deptList = await this.departmentsService.list();
@@ -80,7 +81,10 @@ export class DutiesService {
   async update(id: string, dto: Partial<{ departmentId: string; date: string; shift: Shift; timeIn: string; timeOut: string; status: DutyStatus }>) {
     const update: any = {};
     if (dto.departmentId) update.departmentId = dto.departmentId;
-    if (dto.shift) update.shift = dto.shift;
+    if (dto.shift) {
+      if (dto.shift === Shift.AFTERNOON) throw new BadRequestException('Afternoon shift is not allowed');
+      update.shift = dto.shift;
+    }
     if (dto.status) update.status = dto.status;
     if (dto.date) update.date = new Date(dto.date);
     if (dto.timeIn) update.timeIn = new Date(dto.timeIn);
@@ -107,12 +111,10 @@ export class DutiesService {
     const now = new Date();
     const h = now.getHours();
     const min = now.getMinutes();
-    const isMorning = (h > 8 && h < 14) || (h === 8 && min >= 0) || (h === 13 && min <= 59);
-    const isAfternoon = (h > 14 && h < 21) || (h === 14 && min >= 0) || (h === 20 && min <= 59);
-    const isNight = h >= 21 || h < 8;
+    const isMorning = h >= 8 && h < 14;
+    const isNight = h >= 14 || h < 8;
     let shift: Shift | null = null;
     if (isMorning) shift = Shift.MORNING;
-    else if (isAfternoon) shift = Shift.AFTERNOON;
     else if (isNight) shift = Shift.NIGHT;
     if (!shift) return false;
     const base = new Date(now);
@@ -135,12 +137,10 @@ export class DutiesService {
     const now = new Date();
     const h = now.getHours();
     const min = now.getMinutes();
-    const isMorning = (h > 8 && h < 14) || (h === 8 && min >= 0) || (h === 13 && min <= 59);
-    const isAfternoon = (h > 14 && h < 21) || (h === 14 && min >= 0) || (h === 20 && min <= 59);
-    const isNight = h >= 21 || h < 8;
+    const isMorning = h >= 8 && h < 14;
+    const isNight = h >= 14 || h < 8;
     let shift: Shift | null = null;
     if (isMorning) shift = Shift.MORNING;
-    else if (isAfternoon) shift = Shift.AFTERNOON;
     else if (isNight) shift = Shift.NIGHT;
     if (!shift) return false;
     const base = new Date(now);
