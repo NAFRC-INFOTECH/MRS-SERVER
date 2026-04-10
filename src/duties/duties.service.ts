@@ -40,11 +40,11 @@ export class DutiesService {
     const today = new Date();
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const maxStart = new Date(todayStart);
-    maxStart.setDate(maxStart.getDate() + 1);
+    maxStart.setDate(maxStart.getDate() + 3);
     const dutyDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    if (dutyDay < todayStart || dutyDay > maxStart) {
-      throw new BadRequestException('Duty date must be within the next day');
-    }
+    // if (dutyDay < todayStart || dutyDay > maxStart) {
+    //   throw new BadRequestException('Duty date must be within the next 3 days');
+    // }
     const doc = new this.dutyModel({
       doctorUserId: dto.role === 'doctor' ? dto.staffId : undefined,
       nurseUserId: dto.role === 'nurse' ? dto.staffId : undefined,
