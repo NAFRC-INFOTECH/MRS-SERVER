@@ -13,33 +13,33 @@ import { PatientsService } from './patients.service';
 export class PatientsController {
   constructor(private readonly svc: PatientsService) {}
 
-  @Roles('super_admin' as Role, 'recording' as Role)
+  @Roles('super_admin' as Role, 'doctor' as Role, 'recording' as Role)
   @Get()
   async list(@Query('q') q?: string) {
     return this.svc.list(q);
   }
 
-  @Roles('super_admin' as Role, 'recording' as Role)
+  @Roles('super_admin' as Role, 'doctor' as Role, 'recording' as Role)
   @Post()
   async create(@Body() body: any) {
     const doc = await this.svc.create(body);
     return doc.toObject();
   }
 
-  @Roles('super_admin' as Role, 'recording' as Role)
+  @Roles('super_admin' as Role, 'doctor' as Role, 'recording' as Role)
   @Get(':id')
   async get(@Param('id') id: string) {
     const doc = await this.svc.findById(id);
     return doc ? doc.toObject() : null;
   }
 
-  @Roles('super_admin' as Role, 'recording' as Role)
+  @Roles('super_admin' as Role, 'doctor' as Role, 'recording' as Role)
   @Patch(':id')
   async update(@Param('id') id: string, @Body() body: any) {
     const doc = await this.svc.update(id, body);
     return doc.toObject();
   }
-  @Roles('super_admin' as Role, 'recording' as Role)
+  @Roles('super_admin' as Role, 'doctor' as Role, 'recording' as Role)
   @Delete(':id')
   async remove(@Param('id') id: string) {
     await this.svc.remove(id);

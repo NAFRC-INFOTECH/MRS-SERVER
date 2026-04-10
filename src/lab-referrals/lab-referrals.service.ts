@@ -62,11 +62,17 @@ export class LabReferralsService {
       next.setDate(next.getDate() + 1);
       q.date = { $gte: d, $lt: next };
     }
-    const list = await this.model.find(q).sort({ createdAt: -1 }).lean();
+    const list = await this.model
+      .find(q)
+      .populate('senderId', 'name email')
+      .sort({ createdAt: -1 })
+      .lean();
     return list.map((r: any) => ({
       id: String(r._id),
       patientId: String(r.patientId),
-      senderId: String(r.senderId),
+      senderId: typeof r.senderId === 'object' && r.senderId !== null ? String(r.senderId._id) : String(r.senderId),
+      senderName: typeof r.senderId === 'object' && r.senderId !== null ? r.senderId.name : undefined,
+      senderEmail: typeof r.senderId === 'object' && r.senderId !== null ? r.senderId.email : undefined,
       date: r.date,
       serviceNoOrUUID: r.serviceNoOrUUID,
       rank: r.rank,
