@@ -17,7 +17,7 @@ export class DutiesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('super_admin' as Role, 'recording' as Role)
   @Post()
-  async create(@Body() body: { role: 'doctor' | 'nurse'; staffId: string; departmentId: string; date: string; shift: Shift; timeIn: string; timeOut: string; status: DutyStatus; assignedBy: string; }) {
+  async create(@Body() body: { role: 'doctor' | 'nurse'; staffId?: string; staffIds?: string[]; departmentId: string; date: string; shift: Shift; timeIn: string; timeOut: string; status: DutyStatus; assignedBy: string; }) {
     return this.svc.create(body);
   }
 

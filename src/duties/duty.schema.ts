@@ -48,8 +48,8 @@ export class DutyRecord {
 }
 
 export const DutyRecordSchema = SchemaFactory.createForClass(DutyRecord);
-DutyRecordSchema.index({ doctorUserId: 1, date: 1, shift: 1 }, { unique: true, sparse: true });
-DutyRecordSchema.index({ nurseUserId: 1, date: 1, shift: 1 }, { unique: true, sparse: true });
+DutyRecordSchema.index({ doctorUserId: 1, date: 1, shift: 1 }, { sparse: true });
+DutyRecordSchema.index({ nurseUserId: 1, date: 1, shift: 1 }, { sparse: true });
 DutyRecordSchema.pre('validate', function (next) {
   const self = this as any;
   const hasDoctor = !!self.doctorUserId;
@@ -57,7 +57,9 @@ DutyRecordSchema.pre('validate', function (next) {
   if ((hasDoctor && hasNurse) || (!hasDoctor && !hasNurse)) {
     return next(new Error('Either doctorUserId or nurseUserId must be set, but not both'));
   }
-  if (self.timeOut <= self.timeIn) {
+  const diff = self.timeOut.getTime() - self.timeIn.getTime();
+
+  if (diff <= 0 && self.shift !== 'NIGHT') {
     return next(new Error('timeOut must be later than timeIn'));
   }
   next();
