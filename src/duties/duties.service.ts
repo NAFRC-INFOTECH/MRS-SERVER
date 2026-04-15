@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { DutyRecord, DutyRecordDocument, Shift, DutyStatus } from './duty.schema';
@@ -7,7 +7,8 @@ import { DepartmentsService } from '../departments/departments.service';
 
 type CreateDutyDto = {
   role: 'doctor' | 'nurse';
-  staffId: string;
+  staffId?: string;
+  staffIds?: string[];
   departmentId: string;
   date: string;
   shift: Shift;
@@ -18,18 +19,24 @@ type CreateDutyDto = {
 };
 
 @Injectable()
-export class DutiesService {
+export class DutiesService implements OnModuleInit {
   constructor(
     @InjectModel(DutyRecord.name) private readonly dutyModel: Model<DutyRecordDocument>,
     private readonly usersService: UsersService,
     private readonly departmentsService: DepartmentsService
   ) {}
 
-  async create(dto: CreateDutyDto): Promise<DutyRecordDocument> {
+  async onModuleInit() {
+    await this.dutyModel.syncIndexes();
+  }
+
+  async create(dto: CreateDutyDto): Promise<DutyRecordDocument | { createdCount: number; duties: DutyRecordDocument[] }> {
     if (!['doctor', 'nurse'].includes(dto.role)) throw new BadRequestException('Invalid role');
-    if (dto.shift === Shift.AFTERNOON) throw new BadRequestException('Afternoon shift is not allowed');
-    const user = await this.usersService.findById(dto.staffId);
-    if (!user) throw new BadRequestException('Staff not found');
+    const staffIds = Array.from(
+      new Set([dto.staffId, ...(dto.staffIds || [])].filter((id): id is string => !!id && id.trim().length > 0))
+    );
+    if (staffIds.length === 0) throw new BadRequestException('At least one staff is required');
+    if (staffIds.length > 1000) throw new BadRequestException('A duty assignment can include at most 1000 staff');
     const deptList = await this.departmentsService.list();
     const okDept = deptList.find((d: any) => String(d._id) === String(dto.departmentId));
     if (!okDept) throw new BadRequestException('Department not found');
@@ -45,9 +52,32 @@ export class DutiesService {
     if (dutyDay < todayStart || dutyDay > maxStart) {
       throw new BadRequestException('Duty date must be within the next 3 days');
     }
-    const doc = new this.dutyModel({
-      doctorUserId: dto.role === 'doctor' ? dto.staffId : undefined,
-      nurseUserId: dto.role === 'nurse' ? dto.staffId : undefined,
+    const users = await Promise.all(staffIds.map((staffId) => this.usersService.findById(staffId)));
+    const missingIds = staffIds.filter((_staffId, index) => !users[index]);
+    if (missingIds.length > 0) {
+      throw new BadRequestException(`Staff not found: ${missingIds.slice(0, 10).join(', ')}`);
+    }
+    if (staffIds.length === 1) {
+      const doc = new this.dutyModel({
+        doctorUserId: dto.role === 'doctor' ? staffIds[0] : undefined,
+        nurseUserId: dto.role === 'nurse' ? staffIds[0] : undefined,
+        departmentId: dto.departmentId,
+        date,
+        shift: dto.shift,
+        timeIn,
+        timeOut,
+        status: dto.status,
+        assignedBy: dto.assignedBy
+      });
+      const saved = await doc.save();
+      if (dto.role === 'nurse') {
+        await this.usersService.update(staffIds[0], { department: (okDept as any).name } as any);
+      }
+      return saved;
+    }
+    const docs = staffIds.map((staffId) => ({
+      doctorUserId: dto.role === 'doctor' ? staffId : undefined,
+      nurseUserId: dto.role === 'nurse' ? staffId : undefined,
       departmentId: dto.departmentId,
       date,
       shift: dto.shift,
@@ -55,12 +85,14 @@ export class DutiesService {
       timeOut,
       status: dto.status,
       assignedBy: dto.assignedBy
-    });
-    const saved = await doc.save();
+    }));
+    const saved = await this.dutyModel.insertMany(docs);
     if (dto.role === 'nurse') {
-      await this.usersService.update(dto.staffId, { department: (okDept as any).name } as any);
+      await Promise.all(
+        staffIds.map((staffId) => this.usersService.update(staffId, { department: (okDept as any).name } as any))
+      );
     }
-    return saved;
+    return { createdCount: saved.length, duties: saved };
   }
 
   async list(filters: { role?: 'doctor' | 'nurse'; departmentId?: string; date?: string; shift?: Shift }) {
@@ -81,10 +113,7 @@ export class DutiesService {
   async update(id: string, dto: Partial<{ departmentId: string; date: string; shift: Shift; timeIn: string; timeOut: string; status: DutyStatus }>) {
     const update: any = {};
     if (dto.departmentId) update.departmentId = dto.departmentId;
-    if (dto.shift) {
-      if (dto.shift === Shift.AFTERNOON) throw new BadRequestException('Afternoon shift is not allowed');
-      update.shift = dto.shift;
-    }
+    if (dto.shift) update.shift = dto.shift;
     if (dto.status) update.status = dto.status;
     if (dto.date) update.date = new Date(dto.date);
     if (dto.timeIn) update.timeIn = new Date(dto.timeIn);
@@ -110,11 +139,12 @@ export class DutiesService {
   async isNurseOnDutyNow(nurseUserId: string): Promise<boolean> {
     const now = new Date();
     const h = now.getHours();
-    const min = now.getMinutes();
     const isMorning = h >= 8 && h < 14;
-    const isNight = h >= 14 || h < 8;
+    const isAfternoon = h >= 14 && h < 21;
+    const isNight = h >= 21 || h < 8;
     let shift: Shift | null = null;
     if (isMorning) shift = Shift.MORNING;
+    else if (isAfternoon) shift = Shift.AFTERNOON;
     else if (isNight) shift = Shift.NIGHT;
     if (!shift) return false;
     const base = new Date(now);
@@ -136,11 +166,12 @@ export class DutiesService {
   async isDoctorOnDutyNow(doctorUserId: string): Promise<boolean> {
     const now = new Date();
     const h = now.getHours();
-    const min = now.getMinutes();
     const isMorning = h >= 8 && h < 14;
-    const isNight = h >= 14 || h < 8;
+    const isAfternoon = h >= 14 && h < 21;
+    const isNight = h >= 21 || h < 8;
     let shift: Shift | null = null;
     if (isMorning) shift = Shift.MORNING;
+    else if (isAfternoon) shift = Shift.AFTERNOON;
     else if (isNight) shift = Shift.NIGHT;
     if (!shift) return false;
     const base = new Date(now);
