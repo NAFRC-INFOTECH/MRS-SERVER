@@ -15,7 +15,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Get()
   async listByRole(@Query('role') role?: string) {
     const list = role ? await this.usersService.findByRole(role) : await this.usersService.findAll();
@@ -28,7 +28,7 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Get('id/:id')
   async findById(@Param('id') id: string) {
     const user = await this.usersService.findById(id);
@@ -40,7 +40,7 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Get(':email')
   async findByEmail(@Param('email') email: string) {
     const user = await this.usersService.findByEmail(email);
@@ -52,7 +52,7 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Patch(':id')
   async update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
     const user = await this.usersService.update(id, dto);
@@ -63,7 +63,7 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Patch(':id/roles')
   async assignRoles(@Param('id') id: string, @Body() dto: AssignRolesDto) {
     const user = await this.usersService.assignRoles(id, dto.roles);
@@ -74,7 +74,7 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Patch(':id/suspend')
   async suspend(@Param('id') id: string, @Body() body: { suspended: boolean }) {
     const user = await this.usersService.suspend(id, !!body.suspended);
@@ -85,7 +85,7 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Delete(':id')
   async remove(@Param('id') id: string) {
     await this.usersService.remove(id);
@@ -93,7 +93,7 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Patch(':id/doctor/status')
   async updateDoctorStatus(@Param('id') id: string, @Body() body: { status: string }) {
     const user = await this.usersService.updateDoctorStatus(id, body.status);
@@ -104,7 +104,7 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Patch(':id/reset-password')
   async resetPassword(@Param('id') id: string) {
     return this.usersService.resetPassword(id);
