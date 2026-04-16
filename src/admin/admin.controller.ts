@@ -23,4 +23,17 @@ export class AdminController {
     delete safe.refreshTokenHash;
     return safe;
   }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role)
+  @Post('signup')
+  async signupAdmin(@Body() dto: { name: string; email: string; password: string }) {
+    const user = await this.adminService.createAdminUser(dto);
+    const obj = user.toObject();
+    const safe = { ...obj };
+    delete safe.passwordHash;
+    delete safe.refreshTokenHash;
+    return safe;
+  }
 }

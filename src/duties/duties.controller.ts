@@ -15,7 +15,7 @@ export class DutiesController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role, 'recording' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'recording' as Role)
   @Post()
   async create(@Body() body: { role: 'doctor' | 'nurse'; staffId?: string; staffIds?: string[]; departmentId: string; date: string; shift: Shift; timeIn: string; timeOut: string; status: DutyStatus; assignedBy: string; }) {
     return this.svc.create(body);
@@ -30,7 +30,7 @@ export class DutiesController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role, 'recording' as Role, 'nurse' as Role, 'doctor' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'recording' as Role, 'nurse' as Role, 'doctor' as Role)
   @Patch(':id')
   async update(@Param('id') id: string, @Body() body: Partial<{ departmentId: string; date: string; shift: Shift; timeIn: string; timeOut: string; status: DutyStatus }>, @Req() req: any) {
     const duty = await this.svc.getById(id);
@@ -48,7 +48,7 @@ export class DutiesController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role, 'recording' as Role, 'nurse' as Role, 'doctor' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'recording' as Role, 'nurse' as Role, 'doctor' as Role)
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req: any) {
     const duty = await this.svc.getById(id);

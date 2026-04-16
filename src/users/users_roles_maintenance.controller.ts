@@ -17,7 +17,7 @@ export class UsersRolesMaintenanceController {
   ) {}
 
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('super_admin' as Role)
+    @Roles('super_admin' as Role, 'admin' as Role)
     @Post('roles/normalize-doctors')
     async normalizeDoctors() {
       const withDoctor = await this.usersService.findByRole('doctor');
@@ -36,7 +36,7 @@ export class UsersRolesMaintenanceController {
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('super_admin' as Role)
+    @Roles('super_admin' as Role, 'admin' as Role)
     @Post('migrate/doctor-profiles-to-users')
     async migrateDoctorProfilesToUsers() {
       const profiles = await this.doctorProfileService.listAll();
@@ -49,7 +49,7 @@ export class UsersRolesMaintenanceController {
     }
 
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('super_admin' as Role)
+    @Roles('super_admin' as Role, 'admin' as Role)
     @Post('roles/remove-patient')
     async removePatientRoleFromAll() {
       const all = await this.usersService.findAll();

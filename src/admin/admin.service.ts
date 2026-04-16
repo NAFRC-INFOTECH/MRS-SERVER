@@ -29,6 +29,21 @@ export class AdminService {
     return admin.save();
   }
 
+  async createAdminUser(dto: { name: string; email: string; password: string }): Promise<UserDocument> {
+    const existsAdmin = await this.adminModel.findOne({ email: dto.email }).lean();
+    if (existsAdmin) throw new ConflictException('Email already registered');
+    const existsUser = await this.userModel.findOne({ email: dto.email }).lean();
+    if (existsUser) throw new ConflictException('Email already registered');
+    const passwordHash = await this.passwordService.hash(dto.password);
+    const user = new this.userModel({
+      email: dto.email,
+      name: dto.name,
+      passwordHash,
+      roles: ['admin']
+    });
+    return user.save();
+  }
+
   async adminExists(): Promise<boolean> {
     const doc = await this.adminModel.findOne({}, { _id: 1 }).lean();
     return !!doc;
