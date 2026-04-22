@@ -22,7 +22,7 @@ export class DoctorProfileController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Get()
   async listAll() {
     const list = await this.profileService.listAll();
@@ -31,7 +31,7 @@ export class DoctorProfileController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Get(':userId')
   async getByUserId(@Param('userId') userId: string) {
     try {
@@ -149,7 +149,7 @@ export class DoctorProfileController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Patch(':userId/status')
   async updateStatus(@Param('userId') userId: string, @Body() body: { status: string }) {
     const profile = await this.profileService.updateStatus(userId, body.status);
@@ -158,7 +158,7 @@ export class DoctorProfileController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Delete(':userId')
   async remove(@Param('userId') userId: string) {
     return this.profileService.deleteByUserId(userId);
@@ -166,7 +166,7 @@ export class DoctorProfileController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Patch(':userId/reset-password')
   async resetPassword(@Param('userId') userId: string) {
     return this.profileService.resetPassword(userId);
