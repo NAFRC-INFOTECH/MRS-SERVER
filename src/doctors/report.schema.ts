@@ -12,7 +12,16 @@ export class DoctorReport {
   senderId: Types.ObjectId;
 
   @Prop({ trim: true })
+  senderName?: string;
+
+  @Prop({ trim: true })
   text?: string;
+
+  @Prop({ trim: true })
+  clinicalNote?: string;
+
+  @Prop({ trim: true })
+  diagnosis?: string;
 
   @Prop({ trim: true })
   imageUrl?: string;

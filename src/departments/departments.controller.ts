@@ -19,7 +19,7 @@ export class DepartmentsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Post()
   async create(@Body() body: { name: string; description?: string }) {
     return this.svc.create(body.name, body.description);
@@ -27,7 +27,7 @@ export class DepartmentsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Patch(':id')
   async update(@Param('id') id: string, @Body() body: { name?: string; description?: string }) {
     return this.svc.update(id, body);
@@ -35,7 +35,7 @@ export class DepartmentsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Delete(':id')
   async remove(@Param('id') id: string) {
     await this.svc.remove(id);

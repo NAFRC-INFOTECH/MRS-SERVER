@@ -14,7 +14,7 @@ export class InvitationsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Post('doctor')
   async inviteDoctor(@Req() req: { user: { userId: string } }, @Body() dto: { email: string }) {
     const doc = await this.invitationsService.inviteDoctor(dto.email, req.user?.userId);
@@ -23,7 +23,7 @@ export class InvitationsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Post('doctor/direct')
   async createDoctorDirect(@Body() dto: { name: string; email: string }) {
     const res = await this.invitationsService.createDoctorDirect(dto.name, dto.email);
@@ -32,7 +32,7 @@ export class InvitationsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Post('nurse')
   async inviteNurse(@Req() req: { user: { userId: string } }, @Body() dto: { email: string }) {
     const inv = await this.invitationsService.inviteNurse(dto.email, req.user?.userId);
@@ -41,7 +41,7 @@ export class InvitationsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Post('nurse/direct')
   async createNurseDirect(@Body() dto: { name: string; email: string; department?: string }) {
     const res = await this.invitationsService.createNurseDirect(dto.name, dto.email, dto.department);
@@ -50,7 +50,7 @@ export class InvitationsController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Post('recording/direct')
   async createRecordingDirect(@Body() dto: { name: string; email: string }) {
     const res = await this.invitationsService.createRecordingDirect(dto.name, dto.email);

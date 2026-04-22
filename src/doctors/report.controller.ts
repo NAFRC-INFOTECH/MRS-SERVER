@@ -13,26 +13,39 @@ import { ReportService } from './report.service';
 export class ReportController {
   constructor(private readonly svc: ReportService) {}
 
-  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role)
+  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role, 'admin' as Role)
   @Post()
-  async add(@Req() req: any, @Body() body: { patientId: string; text?: string; imageUrl?: string; replyToId?: string }) {
+  async add(@Req() req: any, @Body() body: { patientId: string; text?: string; clinicalNote?: string; diagnosis?: string; imageUrl?: string; replyToId?: string }) {
     const senderId = req?.user?.sub as string;
-    return this.svc.add({ patientId: body.patientId, senderId, text: body.text, imageUrl: body.imageUrl, replyToId: body.replyToId });
+    return this.svc.add({
+      patientId: body.patientId,
+      senderId,
+      text: body.text,
+      clinicalNote: body.clinicalNote,
+      diagnosis: body.diagnosis,
+      imageUrl: body.imageUrl,
+      replyToId: body.replyToId,
+    });
   }
 
-  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role)
+  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role, 'admin' as Role)
   @Get()
   async list(@Query('patientId') patientId: string) {
     return this.svc.list(patientId);
   }
 
-  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role)
+  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role, 'admin' as Role)
   @Put(':id')
-  async update(@Param('id') id: string, @Body() body: { text?: string; imageUrl?: string }) {
-    return this.svc.update(id, { text: body.text, imageUrl: body.imageUrl });
+  async update(@Param('id') id: string, @Body() body: { text?: string; clinicalNote?: string; diagnosis?: string; imageUrl?: string }) {
+    return this.svc.update(id, {
+      text: body.text,
+      clinicalNote: body.clinicalNote,
+      diagnosis: body.diagnosis,
+      imageUrl: body.imageUrl,
+    });
   }
 
-  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role)
+  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role, 'admin' as Role)
   @Delete(':id')
   async remove(@Param('id') id: string) {
     return this.svc.remove(id);

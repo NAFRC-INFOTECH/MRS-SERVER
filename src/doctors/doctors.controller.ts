@@ -15,7 +15,7 @@ export class DoctorsController {
   constructor(private readonly usersService: UsersService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role, 'recording' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'recording' as Role)
   @Get()
   async list(@Query('department') department?: string) {
     const list = await this.usersService.findByRole('doctor');

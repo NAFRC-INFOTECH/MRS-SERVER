@@ -85,7 +85,14 @@ export class AuthService {
       const okDuty = await this.dutiesService.isDoctorOnDutyNow(doc.id);
       if (!okDuty) throw new UnauthorizedException('Doctor not on active duty shift');
     }
-    const tokens = await this.issueTokens(doc.id, doc.email, roles, doc.passwordVersion, (doc as any).department);
+    const tokens = await this.issueTokens(
+      doc.id,
+      doc.email,
+      roles,
+      doc.passwordVersion,
+      (doc as any).department,
+      doc.name
+    );
     const refreshTokenHash = await this.passwordService.hash(tokens.refreshToken);
     if (isAdmin) await this.adminService.setRefreshToken(doc.id, refreshTokenHash);
     else await this.usersService.setRefreshToken(doc.id, refreshTokenHash);
@@ -98,7 +105,14 @@ export class AuthService {
     if (admin && admin.refreshTokenHash) {
       const ok = await this.passwordService.verify(providedToken, admin.refreshTokenHash);
       if (!ok) throw new UnauthorizedException('Invalid token');
-      const tokens = await this.issueTokens(admin.id, admin.email, admin.roles, admin.passwordVersion, (admin as any).department);
+      const tokens = await this.issueTokens(
+        admin.id,
+        admin.email,
+        admin.roles,
+        admin.passwordVersion,
+        (admin as any).department,
+        admin.name
+      );
       const refreshTokenHash = await this.passwordService.hash(tokens.refreshToken);
       await this.adminService.setRefreshToken(admin.id, refreshTokenHash);
       return tokens;
@@ -107,7 +121,14 @@ export class AuthService {
     if (user && user.refreshTokenHash) {
       const ok = await this.passwordService.verify(providedToken, user.refreshTokenHash);
       if (!ok) throw new UnauthorizedException('Invalid token');
-      const tokens = await this.issueTokens(user.id, user.email, user.roles, user.passwordVersion, (user as any).department);
+      const tokens = await this.issueTokens(
+        user.id,
+        user.email,
+        user.roles,
+        user.passwordVersion,
+        (user as any).department,
+        user.name
+      );
       const refreshTokenHash = await this.passwordService.hash(tokens.refreshToken);
       await this.usersService.setRefreshToken(user.id, refreshTokenHash);
       return tokens;
@@ -118,7 +139,14 @@ export class AuthService {
     const migrated = await this.usersService.upsertFromDoctorProfile(doctor);
     const okDoc = await this.passwordService.verify(providedToken, migrated.refreshTokenHash || '');
     if (!okDoc) throw new UnauthorizedException('Invalid token');
-    const tokens = await this.issueTokens(migrated.id, migrated.email, migrated.roles, migrated.passwordVersion, (migrated as any).department);
+    const tokens = await this.issueTokens(
+      migrated.id,
+      migrated.email,
+      migrated.roles,
+      migrated.passwordVersion,
+      (migrated as any).department,
+      migrated.name
+    );
     const refreshTokenHash = await this.passwordService.hash(tokens.refreshToken);
     await this.usersService.setRefreshToken(migrated.id, refreshTokenHash);
     return tokens;
@@ -136,8 +164,15 @@ export class AuthService {
     return { ok: true };
   }
 
-  private async issueTokens(sub: string, email: string, roles: string[], pv: number, department?: string) {
-    const payload = { sub, email, roles, pv, department };
+  private async issueTokens(
+    sub: string,
+    email: string,
+    roles: string[],
+    pv: number,
+    department?: string,
+    name?: string
+  ) {
+    const payload = { sub, email, roles, pv, department, name };
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
       expiresIn: '24h'
