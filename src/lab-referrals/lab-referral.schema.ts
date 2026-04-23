@@ -62,6 +62,9 @@ export class LabReferral {
  
   @Prop({ type: Date })
   previousReportDate?: Date;
+
+  @Prop({ type: Map, of: String, default: {} })
+  testResults?: Record<string, string>;
  
   @Prop({ type: String, enum: Object.values(LabReferralStatus), default: LabReferralStatus.PENDING })
   status: LabReferralStatus;
