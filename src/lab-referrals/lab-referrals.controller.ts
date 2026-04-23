@@ -50,4 +50,13 @@ export class LabReferralsController {
   async setStatus(@Param('id') id: string, @Body() body: { status: LabReferralStatus }) {
     return this.svc.setStatus(id, body.status);
   }
+
+  @Roles('nurse' as Role, 'super_admin' as Role)
+  @Put(':id/results')
+  async updateResults(
+    @Param('id') id: string,
+    @Body() body: { testResults: Record<string, string> }
+  ) {
+    return this.svc.updateResults(id, { testResults: body.testResults || {} });
+  }
 }

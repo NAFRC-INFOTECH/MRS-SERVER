@@ -22,6 +22,10 @@ type CreateReferralDto = {
   previousReportNos?: string;
   previousReportDate?: string;
 };
+
+type LabTestResultsDto = {
+  testResults: Record<string, string>;
+};
  
 @Injectable()
 export class LabReferralsService {
@@ -48,6 +52,7 @@ export class LabReferralsService {
       statement: dto.statement,
       previousReportNos: dto.previousReportNos,
       previousReportDate: prevDate,
+      testResults: {},
       status: LabReferralStatus.PENDING,
     });
     return await doc.save();
@@ -88,6 +93,10 @@ export class LabReferralsService {
       statement: r.statement,
       previousReportNos: r.previousReportNos,
       previousReportDate: r.previousReportDate,
+      testResults:
+        r.testResults instanceof Map
+          ? Object.fromEntries(r.testResults)
+          : (r.testResults || {}),
       status: r.status,
       createdAt: r.createdAt,
     }));
@@ -98,5 +107,23 @@ export class LabReferralsService {
     const saved = await this.model.findByIdAndUpdate(id, { status }, { new: true }).lean();
     if (!saved) throw new BadRequestException('Referral not found');
     return { id: String(saved._id), status: saved.status };
+  }
+
+  async updateResults(id: string, dto: LabTestResultsDto): Promise<any> {
+    const saved = await this.model
+      .findByIdAndUpdate(
+        id,
+        { testResults: dto.testResults || {} },
+        { new: true }
+      )
+      .lean();
+    if (!saved) throw new BadRequestException('Referral not found');
+    return {
+      id: String(saved._id),
+      testResults:
+        saved.testResults instanceof Map
+          ? Object.fromEntries(saved.testResults)
+          : (saved.testResults || {}),
+    };
   }
 }
