@@ -19,6 +19,18 @@ export class PatientsController {
     return this.svc.list(q);
   }
 
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'nurse' as Role)
+  @Get('paypoint/referred')
+  async listPaypointReferred(@Query('q') q?: string) {
+    return this.svc.listPaypointReferred(q);
+  }
+
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'nurse' as Role)
+  @Get('nhia/referred')
+  async listNHIAReferred(@Query('q') q?: string) {
+    return this.svc.listNHIAReferred(q);
+  }
+
   @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role)
   @Post()
   async create(@Body() body: any) {

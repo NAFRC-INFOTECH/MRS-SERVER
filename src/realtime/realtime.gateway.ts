@@ -5,6 +5,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 
 @WebSocketGateway({
   namespace: '/ws',
+  transports: ['websocket'],
   cors: {
     origin: (() => {
       const raw = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5173';
