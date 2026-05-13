@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Patch,
   Post,
@@ -13,22 +15,23 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { PriceListService } from './price-list.service';
+import { PriceListService, type SummaryPeriod } from './price-list.service';
 import { CreatePriceItemDto } from './dto/create-price-item.dto';
 import { UpdatePriceItemDto } from './dto/update-price-item.dto';
-import { PriceCategory } from './price-item.schema';
 
 @ApiTags('Price List')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller({ path: 'price-list', version: '1' })
 export class PriceListController {
+  private readonly logger = new Logger(PriceListController.name);
+
   constructor(private readonly priceListService: PriceListService) {}
 
   @Get()
   async list(
     @Query('q') q?: string,
-    @Query('category') category?: PriceCategory,
+    @Query('category') category?: string,
     @Query('activeOnly') activeOnly?: string,
   ) {
     return this.priceListService.list({
@@ -36,6 +39,59 @@ export class PriceListController {
       category,
       activeOnly: activeOnly === 'true',
     });
+  }
+
+  @Get('summary')
+  async summary(
+    @Query('period') period?: SummaryPeriod,
+    @Query('monthlyDate') monthlyDate?: string,
+    @Query('yearlyDate') yearlyDate?: string,
+    @Query('referenceDate') referenceDate?: string,
+  ) {
+    console.log('[PriceListController] summary called with params:', { period, monthlyDate, yearlyDate, referenceDate });
+    try {
+      const result = period 
+        ? await this.priceListService.getSummary(period, referenceDate) 
+        : await this.priceListService.getSummaries({ monthly: monthlyDate, yearly: yearlyDate });
+      console.log('[PriceListController] summary returning:', result);
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown summary controller error';
+      this.logger.error(`Summary endpoint failed: ${message}`, error);
+      const fallback = {
+        period: 'monthly' as const,
+        from: '',
+        to: '',
+        totalItems: 0,
+        activeItems: 0,
+        drugs: 0,
+        totalDrugs: 0,
+        services: 0,
+        totalValue: 0,
+        totalDrugsInStock: 0,
+        totalDrugsSold: 0,
+        totalDrugsSoldValue: 0,
+      };
+
+      if (period) return { ...fallback, period };
+      return {
+        monthly: { ...fallback, period: 'monthly' as const },
+        yearly: { ...fallback, period: 'yearly' as const },
+      };
+    }
+  }
+
+  @Post('summary')
+  @Roles('super_admin', 'admin')
+  async saveSummary(@Body() summaryData: any) {
+    console.log('[PriceListController] saveSummary called with data:', summaryData);
+    try {
+      return await this.priceListService.saveSummary(summaryData);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save summary';
+      this.logger.error(`saveSummary endpoint failed: ${message}`, error);
+      throw new BadRequestException(message);
+    }
   }
 
   @Get(':id')

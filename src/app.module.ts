@@ -25,6 +25,7 @@ import { NursesModule } from './nurses/nurses.module';
 import { DoctorsModule } from './doctors/doctors.module';
 import { LabReferralsModule } from './lab-referrals/lab-referrals.module';
 import { PriceListModule } from './price-list/price-list.module';
+import { InvoicesModule } from './invoices/invoices.module';
 
 // import { AdminModule } from './admin/admin.module';
 
