@@ -34,6 +34,12 @@ export class PriceItem {
 
   @Prop({ default: 0 })
   sortOrder: number;
+
+  @Prop({ default: 0, min: 0 })
+  stockQuantity: number;
+
+  @Prop({ default: 0, min: 0 })
+  soldQuantity: number;
 }
 
 export const PriceItemSchema = SchemaFactory.createForClass(PriceItem);

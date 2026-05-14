@@ -43,7 +43,7 @@ export class PatientsController {
     return this.svc.addToPharmacy(body.patientId, { prescription: body.prescription, drugs: body.drugs });
   }
 
-  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'pharmacy' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'pharmacy' as Role, 'nurse' as Role)
   @Patch('pharmacy/:patientId/desk-state')
   async updatePharmacyDeskState(
     @Param('patientId') patientId: string,

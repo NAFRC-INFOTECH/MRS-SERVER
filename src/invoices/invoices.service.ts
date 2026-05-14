@@ -11,6 +11,10 @@ export class InvoicesService {
     @InjectModel(Patient.name) private readonly patientModel: Model<PatientDocument>,
   ) {}
 
+  async findAll(): Promise<InvoiceDocument[]> {
+    return this.invoiceModel.find().sort({ createdAt: -1 }).lean();
+  }
+
   async create(patientId: string, drugs: any[]): Promise<InvoiceDocument> {
     const id = new Types.ObjectId(patientId);
     const patient = await this.patientModel.findById(id);

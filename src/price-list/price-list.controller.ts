@@ -15,6 +15,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import type { Role } from '../common/types/roles';
 import { PriceListService, type SummaryPeriod } from './price-list.service';
 import { CreatePriceItemDto } from './dto/create-price-item.dto';
 import { UpdatePriceItemDto } from './dto/update-price-item.dto';
@@ -109,6 +110,12 @@ export class PriceListController {
   @Roles('super_admin', 'admin')
   async update(@Param('id') id: string, @Body() dto: UpdatePriceItemDto) {
     return this.priceListService.update(id, dto);
+  }
+
+  @Patch(':id/dispense')
+  @Roles('super_admin' as Role, 'admin' as Role, 'pharmacy' as Role, 'nurse' as Role)
+  async recordDispense(@Param('id') id: string, @Body() body: { quantity: number }) {
+    return this.priceListService.recordDispense(id, body.quantity);
   }
 
   @Delete(':id')

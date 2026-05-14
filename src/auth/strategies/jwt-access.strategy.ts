@@ -6,7 +6,8 @@ import { ConfigService } from '@nestjs/config';
 interface JwtPayload {
   sub: string;
   email: string;
-  roles: string[];
+  roles?: string[];
+  role?: string;
   pv: number;
 }
 
@@ -21,6 +22,16 @@ export class JwtAccessStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: JwtPayload) {
-    return { userId: payload.sub, email: payload.email, roles: payload.roles, pv: payload.pv };
+    const rawRoles =
+      Array.isArray(payload.roles) && payload.roles.length > 0
+        ? payload.roles
+        : payload.role
+          ? [payload.role]
+          : [];
+    const roles = rawRoles
+      .map((r) => String(r).trim().toLowerCase())
+      .map((r) => (r === 'pharmacist' ? 'pharmacy' : r))
+      .filter(Boolean);
+    return { userId: payload.sub, email: payload.email, roles, pv: payload.pv };
   }
 }

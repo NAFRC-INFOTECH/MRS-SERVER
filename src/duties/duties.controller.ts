@@ -17,14 +17,14 @@ export class DutiesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('super_admin' as Role, 'admin' as Role, 'recording' as Role)
   @Post()
-  async create(@Body() body: { role: 'doctor' | 'nurse'; staffId?: string; staffIds?: string[]; departmentId: string; date: string; shift: Shift; timeIn: string; timeOut: string; status: DutyStatus; assignedBy: string; }) {
+  async create(@Body() body: { role: 'doctor' | 'nurse' | 'recording'; staffId?: string; staffIds?: string[]; departmentId: string; date: string; shift: Shift; timeIn: string; timeOut: string; status: DutyStatus; assignedBy: string; }) {
     return this.svc.create(body);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Get()
-  async list(@Query() query: { role?: 'doctor' | 'nurse'; departmentId?: string; date?: string; shift?: Shift }) {
+  async list(@Query() query: { role?: 'doctor' | 'nurse' | 'recording'; departmentId?: string; date?: string; shift?: Shift }) {
     return this.svc.list(query);
   }
 
@@ -43,6 +43,9 @@ export class DutiesController {
     if (roles.includes('doctor') && String(duty.doctorUserId) !== String(userId)) {
       throw new ForbiddenException('Cannot edit other doctor duty');
     }
+    if (roles.includes('recording') && String(duty.recordingUserId) !== String(userId)) {
+      throw new ForbiddenException('Cannot edit other recording staff duty');
+    }
     return this.svc.update(id, body);
   }
 
@@ -60,6 +63,9 @@ export class DutiesController {
     }
     if (roles.includes('doctor') && String(duty.doctorUserId) !== String(userId)) {
       throw new ForbiddenException('Cannot delete other doctor duty');
+    }
+    if (roles.includes('recording') && String(duty.recordingUserId) !== String(userId)) {
+      throw new ForbiddenException('Cannot delete other recording staff duty');
     }
     return this.svc.remove(id);
   }

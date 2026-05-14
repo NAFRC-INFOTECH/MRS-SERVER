@@ -14,6 +14,19 @@ import { PaymentStatus } from './invoice.schema';
 export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
 
+  @Roles(
+    'super_admin' as Role,
+    'admin' as Role,
+    'paypoint' as Role,
+    'doctor' as Role,
+    'nurse' as Role,
+    'recording' as Role,
+  )
+  @Get()
+  async findAll() {
+    return this.invoicesService.findAll();
+  }
+
   @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'pharmacy' as Role, 'nurse' as Role)
   @Post()
   async create(@Body() body: { patientId: string; drugs: any[] }) {
@@ -32,7 +45,14 @@ export class InvoicesController {
     return this.invoicesService.findOne(id);
   }
 
-  @Roles('super_admin' as Role, 'admin' as Role, 'paypoint' as Role)
+  @Roles(
+    'super_admin' as Role,
+    'admin' as Role,
+    'paypoint' as Role,
+    'doctor' as Role,
+    'nurse' as Role,
+    'recording' as Role,
+  )
   @Patch(':id/payment-status')
   async updatePaymentStatus(
     @Param('id') id: string,
