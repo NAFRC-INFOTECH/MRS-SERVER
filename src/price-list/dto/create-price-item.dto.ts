@@ -36,4 +36,16 @@ export class CreatePriceItemDto {
   @IsNumber()
   @IsOptional()
   sortOrder?: number;
+
+  @ApiProperty({ required: false, default: 0 })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  stockQuantity?: number;
+
+  @ApiProperty({ required: false, default: 0 })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  soldQuantity?: number;
 }

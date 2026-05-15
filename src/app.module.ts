@@ -106,7 +106,8 @@ import { InvoicesModule } from './invoices/invoices.module';
     NursesModule,
     DoctorsModule,
     LabReferralsModule,
-    PriceListModule
+    PriceListModule,
+    InvoicesModule
   ],
   providers: [
     {

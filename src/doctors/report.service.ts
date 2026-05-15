@@ -11,15 +11,16 @@ export class ReportService {
     private readonly usersService: UsersService
   ) {}
 
-  async add(payload: { patientId: string; senderId: string; text?: string; clinicalNote?: string; diagnosis?: string; imageUrl?: string; replyToId?: string }) {
+  async add(payload: { patientId: string; senderId: string; text?: string; clinicalNote?: string; diagnosis?: string; imageUrl?: string; replyToId?: string; senderName?: string }) {
     if (!payload.text && !payload.clinicalNote && !payload.diagnosis && !payload.imageUrl) {
       throw new BadRequestException('clinical note, diagnosis, text or imageUrl required');
     }
     const sender = await this.usersService.findById(payload.senderId);
+    const fallbackSenderName = String(payload.senderName || '').trim();
     const doc = new this.model({
       patientId: new Types.ObjectId(payload.patientId),
       senderId: new Types.ObjectId(payload.senderId),
-      senderName: sender?.name || 'Doctor',
+      senderName: sender?.name || sender?.email || fallbackSenderName || '',
       text: payload.text,
       clinicalNote: payload.clinicalNote,
       diagnosis: payload.diagnosis,
@@ -32,7 +33,11 @@ export class ReportService {
 
   async list(patientId: string) {
     const pid = new Types.ObjectId(patientId);
-    const list = await this.model.find({ patientId: pid }).sort({ createdAt: 1 }).lean();
+    const list = await this.model
+      .find({ patientId: pid })
+      .sort({ createdAt: -1 })
+      .populate('senderId', 'name email')
+      .lean();
     return list.map((r: any) => this.mapReport(r));
   }
 
@@ -43,7 +48,7 @@ export class ReportService {
     if (payload.clinicalNote !== undefined) update.clinicalNote = payload.clinicalNote;
     if (payload.diagnosis !== undefined) update.diagnosis = payload.diagnosis;
     if (payload.imageUrl !== undefined) update.imageUrl = payload.imageUrl;
-    const saved = await this.model.findByIdAndUpdate(_id, update, { new: true }).lean();
+    const saved = await this.model.findByIdAndUpdate(_id, update, { new: true }).populate('senderId', 'name email').lean();
     if (!saved) throw new BadRequestException('Report not found');
     return this.mapReport(saved);
   }
@@ -56,12 +61,14 @@ export class ReportService {
   }
 
   private mapReport(r: any) {
+    const populatedSender = r.senderId && typeof r.senderId === 'object' ? r.senderId : null;
+    const senderName = String(r.senderName ?? populatedSender?.name ?? populatedSender?.email ?? '').trim();
     return {
       id: String(r._id),
       patientId: String(r.patientId),
-      senderId: String(r.senderId),
-      senderName: r.senderName || 'Doctor',
-      doctorName: r.senderName || 'Doctor',
+      senderId: String(populatedSender?._id || r.senderId),
+      senderName: senderName || 'Unknown',
+      doctorName: senderName || 'Unknown',
       text: r.text,
       clinicalNote: r.clinicalNote || r.text,
       diagnosis: r.diagnosis,

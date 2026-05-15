@@ -55,6 +55,8 @@ export class PriceListService implements OnModuleInit {
 
   async create(dto: CreatePriceItemDto): Promise<PriceItemDocument> {
     this.validatePrice(dto.price);
+    this.validateQuantity(dto.stockQuantity);
+    this.validateQuantity(dto.soldQuantity);
 
     const doc = new this.priceItemModel({
       name: dto.name.trim(),
@@ -64,6 +66,8 @@ export class PriceListService implements OnModuleInit {
       price: dto.price,
       isActive: dto.isActive ?? true,
       sortOrder: dto.sortOrder ?? 0,
+      stockQuantity: dto.stockQuantity ?? 0,
+      soldQuantity: dto.soldQuantity ?? 0,
     });
 
     const result = await doc.save();
@@ -84,11 +88,44 @@ export class PriceListService implements OnModuleInit {
     }
     if (dto.isActive !== undefined) update.isActive = dto.isActive;
     if (dto.sortOrder !== undefined) update.sortOrder = dto.sortOrder;
+    if (dto.stockQuantity !== undefined) {
+      this.validateQuantity(dto.stockQuantity);
+      update.stockQuantity = dto.stockQuantity;
+    }
+    if (dto.soldQuantity !== undefined) {
+      this.validateQuantity(dto.soldQuantity);
+      update.soldQuantity = dto.soldQuantity;
+    }
 
     const doc = await this.priceItemModel.findByIdAndUpdate(id, update, { new: true });
     if (!doc) throw new NotFoundException('Price item not found');
     await this.recalculateAllSummaries();
     return doc;
+  }
+
+  async recordDispense(id: string, quantity: number): Promise<PriceItemDocument> {
+    this.validateQuantity(quantity);
+    if (quantity <= 0) {
+      throw new BadRequestException('Dispensed quantity must be greater than zero');
+    }
+
+    const item = await this.priceItemModel.findById(id);
+    if (!item) throw new NotFoundException('Price item not found');
+
+    const currentStock = Number(item.stockQuantity || 0);
+    const nextSoldQuantity = (item.soldQuantity || 0) + quantity;
+
+    if (currentStock > 0) {
+      if (quantity > currentStock) {
+        throw new BadRequestException('Dispensed quantity exceeds available stock');
+      }
+      item.stockQuantity = currentStock - quantity;
+    }
+
+    item.soldQuantity = nextSoldQuantity;
+    await item.save();
+    await this.recalculateAllSummaries();
+    return item;
   }
 
   async remove(id: string) {
@@ -101,6 +138,13 @@ export class PriceListService implements OnModuleInit {
   private validatePrice(price: number) {
     if (!Number.isFinite(price) || price < 0) {
       throw new BadRequestException('Price must be a valid non-negative number');
+    }
+  }
+
+  private validateQuantity(quantity?: number) {
+    if (quantity === undefined) return;
+    if (!Number.isFinite(quantity) || quantity < 0) {
+      throw new BadRequestException('Quantity must be a valid non-negative number');
     }
   }
 
@@ -131,6 +175,21 @@ export class PriceListService implements OnModuleInit {
       }
     }
 
+    const totalDrugsInStock = items.reduce((sum, item) => {
+      if (item?.category !== 'drug') return sum;
+      return sum + (Number(item.stockQuantity) || 0);
+    }, 0);
+
+    const totalDrugsSold = items.reduce((sum, item) => {
+      if (item?.category !== 'drug') return sum;
+      return sum + (Number(item.soldQuantity) || 0);
+    }, 0);
+
+    const totalDrugsSoldValue = items.reduce((sum, item) => {
+      if (item?.category !== 'drug') return sum;
+      return sum + ((Number(item.soldQuantity) || 0) * (Number(item.price) || 0));
+    }, 0);
+
     return {
       period,
       referenceDate,
@@ -140,9 +199,9 @@ export class PriceListService implements OnModuleInit {
       totalDrugs: drugs,
       services,
       totalValue,
-      totalDrugsInStock: 0,
-      totalDrugsSold: 0,
-      totalDrugsSoldValue: 0,
+      totalDrugsInStock,
+      totalDrugsSold,
+      totalDrugsSoldValue,
     };
   }
 

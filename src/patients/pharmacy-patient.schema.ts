@@ -3,6 +3,7 @@ import { Document, Types } from 'mongoose';
 
 export type PharmacyPatientDocument = PharmacyPatient & Document;
 
+@Schema()
 class DrugItem {
   @Prop({ trim: true, required: true })
   name: string;
@@ -15,7 +16,15 @@ class DrugItem {
 
   @Prop({ trim: true, default: '' })
   instructions?: string;
+
+  @Prop({ default: false })
+  dispensed?: boolean;
+
+  @Prop()
+  priceItemId?: string;
 }
+
+const DrugItemSchema = SchemaFactory.createForClass(DrugItem);
 
 @Schema({ timestamps: true, collection: 'pharmacy_patients' })
 export class PharmacyPatient {
@@ -28,7 +37,7 @@ export class PharmacyPatient {
   @Prop({ trim: true, default: '' })
   prescription?: string;
 
-  @Prop({ type: [Object], default: [] })
+  @Prop({ type: [DrugItemSchema], default: [] })
   drugs?: DrugItem[];
 }
 

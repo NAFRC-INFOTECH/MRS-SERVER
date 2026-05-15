@@ -11,8 +11,8 @@ export class DoctorReport {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   senderId: Types.ObjectId;
 
-  @Prop({ trim: true })
-  senderName?: string;
+  @Prop({ trim: true, default: '' })
+  senderName: string;
 
   @Prop({ trim: true })
   text?: string;

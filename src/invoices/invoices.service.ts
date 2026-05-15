@@ -3,18 +3,34 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Invoice, InvoiceDocument, PaymentStatus } from './invoice.schema';
 import { Patient, PatientDocument } from '../patients/patient.schema';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 @Injectable()
 export class InvoicesService {
   constructor(
     @InjectModel(Invoice.name) private readonly invoiceModel: Model<InvoiceDocument>,
     @InjectModel(Patient.name) private readonly patientModel: Model<PatientDocument>,
+    private readonly rt: RealtimeGateway,
   ) {}
 
-  async create(patientId: string, drugs: any[]): Promise<InvoiceDocument> {
+  async findAll(filters?: { createdByRole?: string; createdByUserId?: string }): Promise<InvoiceDocument[]> {
+    const q: any = {};
+    if (filters?.createdByRole) q.createdByRole = String(filters.createdByRole).trim();
+    if (filters?.createdByUserId) q.createdByUserId = new Types.ObjectId(filters.createdByUserId);
+    return this.invoiceModel.find(q).sort({ createdAt: -1 }).lean();
+  }
+
+  async create(
+    patientId: string,
+    payload: { drugs?: any[]; items?: any[] },
+    meta?: { createdByUserId?: string; roles?: string[] },
+  ): Promise<InvoiceDocument> {
     const id = new Types.ObjectId(patientId);
     const patient = await this.patientModel.findById(id);
     if (!patient) throw new NotFoundException('Patient not found');
+
+    const drugs = Array.isArray(payload.drugs) ? payload.drugs : [];
+    const items = Array.isArray(payload.items) ? payload.items : [];
 
     const invoiceDrugs = drugs.map((drug) => ({
       name: drug.name,
@@ -25,21 +41,47 @@ export class InvoicesService {
       totalPrice: (drug.unitPrice || 0) * drug.quantity,
     }));
 
-    const totalCost = invoiceDrugs.reduce((sum, drug) => sum + drug.totalPrice, 0);
+    const invoiceItems = items.map((item) => ({
+      priceItemId: item.priceItemId,
+      category: item.category,
+      unit: item.unit,
+      name: item.name,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice || 0,
+      totalPrice: (item.unitPrice || 0) * item.quantity,
+    }));
+
+    const totalCost =
+      invoiceDrugs.reduce((sum, d) => sum + (d.totalPrice || 0), 0) +
+      invoiceItems.reduce((sum, d) => sum + (d.totalPrice || 0), 0);
 
     const patientCardNumber = patient.serviceNumber || patient.membershipNumber || String(patient._id);
     const patientName = [patient.surname, patient.firstname, patient.middlename].filter(Boolean).join(' ');
 
+    const rolePriority = ['recording', 'paypoint', 'pharmacy', 'doctor', 'nurse', 'admin', 'super_admin'];
+    const roles = meta?.roles || [];
+    const createdByRole = rolePriority.find((r) => roles.includes(r)) || (roles[0] || '');
+
     const invoice = new this.invoiceModel({
       patientId: id,
+      createdByUserId: meta?.createdByUserId ? new Types.ObjectId(meta.createdByUserId) : undefined,
+      createdByRole,
       patientName,
       patientCardNumber,
       drugs: invoiceDrugs,
+      items: invoiceItems,
       totalCost,
       paymentStatus: PaymentStatus.AWAITING,
     });
 
-    return invoice.save();
+    const saved = await invoice.save();
+    this.rt.emit('invoice.created', {
+      id: String(saved._id),
+      patientId: String(saved.patientId),
+      paymentStatus: saved.paymentStatus,
+      totalCost: saved.totalCost,
+    });
+    return saved;
   }
 
   async findByPatientId(patientId: string): Promise<InvoiceDocument[]> {
@@ -56,6 +98,24 @@ export class InvoicesService {
   async updatePaymentStatus(id: string, status: PaymentStatus): Promise<InvoiceDocument> {
     const doc = await this.invoiceModel.findByIdAndUpdate(id, { paymentStatus: status }, { new: true });
     if (!doc) throw new NotFoundException('Invoice not found');
+    this.rt.emit('invoice.updated', {
+      id: String(doc._id),
+      patientId: String(doc.patientId),
+      paymentStatus: doc.paymentStatus,
+      totalCost: doc.totalCost,
+    });
+    if (status === PaymentStatus.PAID) {
+      await this.patientModel.findByIdAndUpdate(
+        doc.patientId,
+        { patientStatus: 'ok', patientQueue: '' },
+        { new: false },
+      );
+      this.rt.emit('patient.updated', {
+        id: String(doc.patientId),
+        patientStatus: 'ok',
+        patientQueue: '',
+      });
+    }
     return doc;
   }
 }

@@ -25,6 +25,9 @@ export class DutyRecord {
   @Prop({ type: Types.ObjectId, ref: 'User', required: false })
   nurseUserId?: string;
 
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  recordingUserId?: string;
+
   @Prop({ type: Types.ObjectId, ref: 'Department', required: true })
   departmentId: string;
 
@@ -50,12 +53,15 @@ export class DutyRecord {
 export const DutyRecordSchema = SchemaFactory.createForClass(DutyRecord);
 DutyRecordSchema.index({ doctorUserId: 1, date: 1, shift: 1 }, { sparse: true });
 DutyRecordSchema.index({ nurseUserId: 1, date: 1, shift: 1 }, { sparse: true });
+DutyRecordSchema.index({ recordingUserId: 1, date: 1, shift: 1 }, { sparse: true });
 DutyRecordSchema.pre('validate', function (next) {
   const self = this as any;
   const hasDoctor = !!self.doctorUserId;
   const hasNurse = !!self.nurseUserId;
-  if ((hasDoctor && hasNurse) || (!hasDoctor && !hasNurse)) {
-    return next(new Error('Either doctorUserId or nurseUserId must be set, but not both'));
+  const hasRecording = !!self.recordingUserId;
+  const count = [hasDoctor, hasNurse, hasRecording].filter(Boolean).length;
+  if (count !== 1) {
+    return next(new Error('Exactly one of doctorUserId, nurseUserId, or recordingUserId must be set'));
   }
   const diff = self.timeOut.getTime() - self.timeIn.getTime();
 

@@ -6,7 +6,7 @@ import { UsersService } from '../users/users.service';
 import { DepartmentsService } from '../departments/departments.service';
 
 type CreateDutyDto = {
-  role: 'doctor' | 'nurse';
+  role: 'doctor' | 'nurse' | 'recording';
   staffId?: string;
   staffIds?: string[];
   departmentId: string;
@@ -31,7 +31,7 @@ export class DutiesService implements OnModuleInit {
   }
 
   async create(dto: CreateDutyDto): Promise<DutyRecordDocument | { createdCount: number; duties: DutyRecordDocument[] }> {
-    if (!['doctor', 'nurse'].includes(dto.role)) throw new BadRequestException('Invalid role');
+    if (!['doctor', 'nurse', 'recording'].includes(dto.role)) throw new BadRequestException('Invalid role');
     const staffIds = Array.from(
       new Set([dto.staffId, ...(dto.staffIds || [])].filter((id): id is string => !!id && id.trim().length > 0))
     );
@@ -61,6 +61,7 @@ export class DutiesService implements OnModuleInit {
       const doc = new this.dutyModel({
         doctorUserId: dto.role === 'doctor' ? staffIds[0] : undefined,
         nurseUserId: dto.role === 'nurse' ? staffIds[0] : undefined,
+        recordingUserId: dto.role === 'recording' ? staffIds[0] : undefined,
         departmentId: dto.departmentId,
         date,
         shift: dto.shift,
@@ -78,6 +79,7 @@ export class DutiesService implements OnModuleInit {
     const docs = staffIds.map((staffId) => ({
       doctorUserId: dto.role === 'doctor' ? staffId : undefined,
       nurseUserId: dto.role === 'nurse' ? staffId : undefined,
+      recordingUserId: dto.role === 'recording' ? staffId : undefined,
       departmentId: dto.departmentId,
       date,
       shift: dto.shift,
@@ -95,10 +97,11 @@ export class DutiesService implements OnModuleInit {
     return { createdCount: saved.length, duties: saved };
   }
 
-  async list(filters: { role?: 'doctor' | 'nurse'; departmentId?: string; date?: string; shift?: Shift }) {
+  async list(filters: { role?: 'doctor' | 'nurse' | 'recording'; departmentId?: string; date?: string; shift?: Shift }) {
     const q: any = {};
     if (filters.role === 'doctor') q.doctorUserId = { $ne: null };
     if (filters.role === 'nurse') q.nurseUserId = { $ne: null };
+    if (filters.role === 'recording') q.recordingUserId = { $ne: null };
     if (filters.departmentId) q.departmentId = filters.departmentId;
     if (filters.date) {
       const d = new Date(filters.date);
@@ -183,6 +186,33 @@ export class DutiesService implements OnModuleInit {
     dayEnd.setDate(dayEnd.getDate() + 1);
     const duty = await this.dutyModel.findOne({
       doctorUserId,
+      date: { $gte: dayStart, $lt: dayEnd },
+      shift,
+      status: DutyStatus.ON_DUTY
+    }).lean();
+    return !!duty;
+  }
+
+  async isRecordingOnDutyNow(recordingUserId: string): Promise<boolean> {
+    const now = new Date();
+    const h = now.getHours();
+    const isMorning = h >= 8 && h < 14;
+    const isAfternoon = h >= 14 && h < 21;
+    const isNight = h >= 21 || h < 8;
+    let shift: Shift | null = null;
+    if (isMorning) shift = Shift.MORNING;
+    else if (isAfternoon) shift = Shift.AFTERNOON;
+    else if (isNight) shift = Shift.NIGHT;
+    if (!shift) return false;
+    const base = new Date(now);
+    if (shift === Shift.NIGHT && h < 8) {
+      base.setDate(base.getDate() - 1);
+    }
+    const dayStart = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    const duty = await this.dutyModel.findOne({
+      recordingUserId,
       date: { $gte: dayStart, $lt: dayEnd },
       shift,
       status: DutyStatus.ON_DUTY
