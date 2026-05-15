@@ -15,7 +15,19 @@ export class ReportController {
 
   @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role, 'admin' as Role)
   @Post()
-  async add(@Req() req: any, @Body() body: { patientId: string; text?: string; clinicalNote?: string; diagnosis?: string; imageUrl?: string; replyToId?: string }) {
+  async add(
+    @Req() req: any,
+    @Body()
+    body: {
+      patientId: string;
+      text?: string;
+      clinicalNote?: string;
+      diagnosis?: string;
+      imageUrl?: string;
+      replyToId?: string;
+      senderName?: string;
+    },
+  ) {
     const senderId = req?.user?.sub as string;
     return this.svc.add({
       patientId: body.patientId,
@@ -25,10 +37,11 @@ export class ReportController {
       diagnosis: body.diagnosis,
       imageUrl: body.imageUrl,
       replyToId: body.replyToId,
+      senderName: body.senderName,
     });
   }
 
-  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role, 'admin' as Role)
+  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role, 'admin' as Role, 'recording' as Role)
   @Get()
   async list(@Query('patientId') patientId: string) {
     return this.svc.list(patientId);

@@ -58,48 +58,91 @@ export class LabReferralsService {
     return await doc.save();
   }
  
-  async list(filters: { status?: LabReferralStatus; q?: string; date?: string }): Promise<any[]> {
+  async list(filters: { status?: LabReferralStatus; q?: string; date?: string; patientId?: string; period?: 'daily' | 'monthly' | 'yearly'; value?: string }): Promise<any[]> {
     const q: any = {};
     if (filters.status) q.status = filters.status;
+    if (filters.patientId) q.patientId = String(filters.patientId);
+
     if (filters.date) {
       const d = new Date(filters.date);
       const next = new Date(d);
       next.setDate(next.getDate() + 1);
       q.date = { $gte: d, $lt: next };
+    } else if (filters.period || filters.value) {
+      const now = new Date();
+      const period = filters.period || 'daily';
+      const value = (filters.value || '').trim();
+
+      let start: Date;
+      let end: Date;
+      if (period === 'monthly') {
+        const [yRaw, mRaw] = value ? value.split('-') : [];
+        const y = Number(yRaw) || now.getFullYear();
+        const m = Number(mRaw) || now.getMonth() + 1;
+        start = new Date(y, m - 1, 1, 0, 0, 0, 0);
+        end = new Date(y, m, 1, 0, 0, 0, 0);
+      } else if (period === 'yearly') {
+        const y = Number(value) || now.getFullYear();
+        start = new Date(y, 0, 1, 0, 0, 0, 0);
+        end = new Date(y + 1, 0, 1, 0, 0, 0, 0);
+      } else {
+        const [yRaw, mRaw, dRaw] = value ? value.split('-') : [];
+        const y = Number(yRaw) || now.getFullYear();
+        const m = Number(mRaw) || now.getMonth() + 1;
+        const d = Number(dRaw) || now.getDate();
+        start = new Date(y, m - 1, d, 0, 0, 0, 0);
+        end = new Date(y, m - 1, d + 1, 0, 0, 0, 0);
+      }
+
+      q.date = { $gte: start, $lt: end };
     }
     const list = await this.model
       .find(q)
       .populate('senderId', 'name email')
       .sort({ createdAt: -1 })
       .lean();
-    return list.map((r: any) => ({
-      id: String(r._id),
-      patientId: String(r.patientId),
-      senderId: typeof r.senderId === 'object' && r.senderId !== null ? String(r.senderId._id) : String(r.senderId),
-      senderName: typeof r.senderId === 'object' && r.senderId !== null ? r.senderId.name : undefined,
-      senderEmail: typeof r.senderId === 'object' && r.senderId !== null ? r.senderId.email : undefined,
-      date: r.date,
-      serviceNoOrUUID: r.serviceNoOrUUID,
-      rank: r.rank,
-      forenames: r.forenames,
-      surname: r.surname,
-      wardNo: r.wardNo,
-      hospitalUnit: r.hospitalUnit,
-      age: r.age,
-      to: r.to,
-      specimen: r.specimen,
-      examinationRequired: r.examinationRequired,
-      diagnosis: r.diagnosis,
-      statement: r.statement,
-      previousReportNos: r.previousReportNos,
-      previousReportDate: r.previousReportDate,
-      testResults:
-        r.testResults instanceof Map
-          ? Object.fromEntries(r.testResults)
-          : (r.testResults || {}),
-      status: r.status,
-      createdAt: r.createdAt,
-    }));
+    return list.map((r: any) => this.mapReferral(r));
+  }
+
+  async listForPatient(
+    patientId: string,
+    filters?: { status?: LabReferralStatus; period?: 'daily' | 'monthly' | 'yearly'; value?: string },
+  ): Promise<any[]> {
+    const now = new Date();
+    const period = filters?.period || 'daily';
+    const value = (filters?.value || '').trim();
+
+    let start: Date;
+    let end: Date;
+    if (period === 'monthly') {
+      const [yRaw, mRaw] = value ? value.split('-') : [];
+      const y = Number(yRaw) || now.getFullYear();
+      const m = Number(mRaw) || now.getMonth() + 1;
+      start = new Date(y, m - 1, 1, 0, 0, 0, 0);
+      end = new Date(y, m, 1, 0, 0, 0, 0);
+    } else if (period === 'yearly') {
+      const y = Number(value) || now.getFullYear();
+      start = new Date(y, 0, 1, 0, 0, 0, 0);
+      end = new Date(y + 1, 0, 1, 0, 0, 0, 0);
+    } else {
+      const [yRaw, mRaw, dRaw] = value ? value.split('-') : [];
+      const y = Number(yRaw) || now.getFullYear();
+      const m = Number(mRaw) || now.getMonth() + 1;
+      const d = Number(dRaw) || now.getDate();
+      start = new Date(y, m - 1, d, 0, 0, 0, 0);
+      end = new Date(y, m - 1, d + 1, 0, 0, 0, 0);
+    }
+
+    const q: any = { patientId };
+    if (filters?.status) q.status = filters.status;
+    q.date = { $gte: start, $lt: end };
+
+    const list = await this.model
+      .find(q)
+      .populate('senderId', 'name email')
+      .sort({ createdAt: -1 })
+      .lean();
+    return list.map((r: any) => this.mapReferral(r));
   }
  
   async setStatus(id: string, status: LabReferralStatus): Promise<any> {
@@ -124,6 +167,36 @@ export class LabReferralsService {
         saved.testResults instanceof Map
           ? Object.fromEntries(saved.testResults)
           : (saved.testResults || {}),
+    };
+  }
+
+  private mapReferral(r: any) {
+    const senderObj = typeof r.senderId === 'object' && r.senderId !== null ? r.senderId : null;
+    return {
+      id: String(r._id),
+      patientId: String(r.patientId),
+      senderId: String(senderObj?._id || r.senderId),
+      senderName: senderObj?.name,
+      senderEmail: senderObj?.email,
+      date: r.date,
+      serviceNoOrUUID: r.serviceNoOrUUID,
+      rank: r.rank,
+      forenames: r.forenames,
+      surname: r.surname,
+      wardNo: r.wardNo,
+      hospitalUnit: r.hospitalUnit,
+      age: r.age,
+      to: r.to,
+      specimen: r.specimen,
+      examinationRequired: r.examinationRequired,
+      diagnosis: r.diagnosis,
+      statement: r.statement,
+      previousReportNos: r.previousReportNos,
+      previousReportDate: r.previousReportDate,
+      testResults: r.testResults instanceof Map ? Object.fromEntries(r.testResults) : (r.testResults || {}),
+      status: r.status,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
     };
   }
 }

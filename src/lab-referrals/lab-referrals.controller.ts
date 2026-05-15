@@ -39,10 +39,27 @@ export class LabReferralsController {
     });
   }
  
-  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role)
+  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role, 'admin' as Role)
   @Get()
-  async list(@Query('status') status?: LabReferralStatus, @Query('date') date?: string) {
-    return this.svc.list({ status, date });
+  async list(
+    @Query('status') status?: LabReferralStatus,
+    @Query('date') date?: string,
+    @Query('patientId') patientId?: string,
+    @Query('period') period?: 'daily' | 'monthly' | 'yearly',
+    @Query('value') value?: string,
+  ) {
+    return this.svc.list({ status, date, patientId, period, value });
+  }
+
+  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role, 'admin' as Role)
+  @Get('patient/:patientId')
+  async listForPatient(
+    @Param('patientId') patientId: string,
+    @Query('period') period?: 'daily' | 'monthly' | 'yearly',
+    @Query('value') value?: string,
+    @Query('status') status?: LabReferralStatus,
+  ) {
+    return this.svc.listForPatient(patientId, { period, value, status });
   }
  
   @Roles('nurse' as Role, 'super_admin' as Role)

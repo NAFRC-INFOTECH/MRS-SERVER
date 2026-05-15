@@ -38,6 +38,9 @@ export class Patient {
   @Prop({ trim: true, default: 'active' }) patientStatus?: string;
   @Prop({ trim: true }) patientQueue?: string;
 
+  @Prop({ trim: true, default: '' }) nhiaStatus?: string;
+  @Prop() nhiaUpdatedAt?: Date;
+
   @Prop({ type: NextOfKin }) nok?: NextOfKin;
 }
 

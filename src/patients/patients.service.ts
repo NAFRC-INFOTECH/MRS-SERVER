@@ -50,7 +50,11 @@ export class PatientsService {
 
   async listNHIAReferred(search?: string): Promise<PatientDocument[]> {
     const q: any = {
-      $or: [{ patientQueue: 'nhia' }, { patientStatus: 'nhia' }],
+      $or: [
+        { patientQueue: 'nhia' },
+        { patientStatus: 'nhia' },
+        { nhiaStatus: { $in: ['cleared', 'not_cleared'] } },
+      ],
     };
 
     if (search && search.trim().length > 0) {
@@ -70,6 +74,81 @@ export class PatientsService {
     }
 
     return this.model.find(q).lean();
+  }
+
+  async getNHIAStats() {
+    return this.getNHIAStatsByRange();
+  }
+
+  async getNHIAStatsByRange(opts?: { period?: 'daily' | 'monthly' | 'yearly'; value?: string }) {
+    const now = new Date();
+    const period = opts?.period || 'daily';
+    const value = (opts?.value || '').trim();
+
+    let start: Date;
+    let end: Date;
+    if (period === 'monthly') {
+      const [yRaw, mRaw] = value ? value.split('-') : [];
+      const y = Number(yRaw) || now.getFullYear();
+      const m = Number(mRaw) || now.getMonth() + 1;
+      start = new Date(y, m - 1, 1, 0, 0, 0, 0);
+      end = new Date(y, m, 1, 0, 0, 0, 0);
+    } else if (period === 'yearly') {
+      const y = Number(value) || now.getFullYear();
+      start = new Date(y, 0, 1, 0, 0, 0, 0);
+      end = new Date(y + 1, 0, 1, 0, 0, 0, 0);
+    } else {
+      const [yRaw, mRaw, dRaw] = value ? value.split('-') : [];
+      const y = Number(yRaw) || now.getFullYear();
+      const m = Number(mRaw) || now.getMonth() + 1;
+      const d = Number(dRaw) || now.getDate();
+      start = new Date(y, m - 1, d, 0, 0, 0, 0);
+      end = new Date(y, m - 1, d + 1, 0, 0, 0, 0);
+    }
+
+    const awaitingQuery: any = {
+      $or: [{ patientQueue: 'nhia' }, { patientStatus: 'nhia' }],
+      updatedAt: { $gte: start, $lt: end },
+    };
+
+    const clearedQuery: any = { nhiaStatus: 'cleared', nhiaUpdatedAt: { $gte: start, $lt: end } };
+    const notClearedQuery: any = { nhiaStatus: 'not_cleared', nhiaUpdatedAt: { $gte: start, $lt: end } };
+
+    const [
+      awaiting,
+      awaitingCivilian,
+      awaitingPersonnel,
+      cleared,
+      clearedCivilian,
+      clearedPersonnel,
+      notCleared,
+      notClearedCivilian,
+      notClearedPersonnel,
+    ] = await Promise.all([
+      this.model.countDocuments(awaitingQuery),
+      this.model.countDocuments({ ...awaitingQuery, veteran: { $ne: true } }),
+      this.model.countDocuments({ ...awaitingQuery, veteran: true }),
+      this.model.countDocuments(clearedQuery),
+      this.model.countDocuments({ ...clearedQuery, veteran: { $ne: true } }),
+      this.model.countDocuments({ ...clearedQuery, veteran: true }),
+      this.model.countDocuments(notClearedQuery),
+      this.model.countDocuments({ ...notClearedQuery, veteran: { $ne: true } }),
+      this.model.countDocuments({ ...notClearedQuery, veteran: true }),
+    ]);
+
+    return {
+      period,
+      value: value || (period === 'daily' ? start.toISOString().slice(0, 10) : period === 'monthly' ? `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}` : String(start.getFullYear())),
+      awaiting,
+      awaitingCivilian,
+      awaitingPersonnel,
+      cleared,
+      clearedCivilian,
+      clearedPersonnel,
+      notCleared,
+      notClearedCivilian,
+      notClearedPersonnel,
+    };
   }
 
   async listPharmacyReferred(search?: string): Promise<any[]> {

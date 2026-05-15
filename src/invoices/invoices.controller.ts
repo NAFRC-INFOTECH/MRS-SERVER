@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, UseGuards, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -23,23 +23,41 @@ export class InvoicesController {
     'recording' as Role,
   )
   @Get()
-  async findAll() {
-    return this.invoicesService.findAll();
+  async findAll(@Query('createdByRole') createdByRole?: string, @Query('createdByUserId') createdByUserId?: string) {
+    return this.invoicesService.findAll({ createdByRole, createdByUserId });
   }
 
-  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'pharmacy' as Role, 'nurse' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'pharmacy' as Role, 'nurse' as Role, 'recording' as Role)
   @Post()
-  async create(@Body() body: { patientId: string; drugs: any[] }) {
-    return this.invoicesService.create(body.patientId, body.drugs);
+  async create(@Req() req: any, @Body() body: { patientId: string; drugs?: any[]; items?: any[] }) {
+    const createdByUserId = req?.user?.sub as string;
+    const roles: string[] = (req?.user?.roles || []) as string[];
+    return this.invoicesService.create(body.patientId, { drugs: body.drugs, items: body.items }, { createdByUserId, roles });
   }
 
-  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'pharmacy' as Role, 'nurse' as Role)
+  @Roles(
+    'super_admin' as Role,
+    'admin' as Role,
+    'paypoint' as Role,
+    'doctor' as Role,
+    'pharmacy' as Role,
+    'nurse' as Role,
+    'recording' as Role,
+  )
   @Get('patient/:patientId')
   async findByPatientId(@Param('patientId') patientId: string) {
     return this.invoicesService.findByPatientId(patientId);
   }
 
-  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'pharmacy' as Role, 'nurse' as Role)
+  @Roles(
+    'super_admin' as Role,
+    'admin' as Role,
+    'paypoint' as Role,
+    'doctor' as Role,
+    'pharmacy' as Role,
+    'nurse' as Role,
+    'recording' as Role,
+  )
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.invoicesService.findOne(id);
