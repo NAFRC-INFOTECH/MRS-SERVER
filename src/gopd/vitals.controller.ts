@@ -13,13 +13,13 @@ import { VitalsService } from './vitals.service';
 export class VitalsController {
   constructor(private readonly svc: VitalsService) {}
 
-  @Roles('nurse' as Role, 'super_admin' as Role)
+  @Roles('staff' as Role, 'super_admin' as Role)
   @Post()
   async create(@Body() body: any) {
     return this.svc.create(body);
   }
 
-  @Roles('nurse' as Role, 'doctor' as Role, 'super_admin' as Role)
+  @Roles('staff' as Role, 'doctor' as Role, 'super_admin' as Role)
   @Get()
   async list(@Query('patientId') patientId: string) {
     return this.svc.listForPatient(patientId);

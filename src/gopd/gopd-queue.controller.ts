@@ -13,7 +13,7 @@ import { GopdQueueService } from './gopd-queue.service';
 export class GopdQueueController {
   constructor(private readonly svc: GopdQueueService) {}
 
-  @Roles('super_admin' as Role, 'nurse' as Role)
+  @Roles('super_admin' as Role, 'staff' as Role)
   @Get()
   async list() {
     return this.svc.list();
@@ -25,7 +25,7 @@ export class GopdQueueController {
     return this.svc.add(body.patientId);
   }
 
-  @Roles('super_admin' as Role, 'nurse' as Role)
+  @Roles('super_admin' as Role, 'staff' as Role)
   @Delete(':patientId')
   async remove(@Param('patientId') patientId: string) {
     await this.svc.remove(patientId);

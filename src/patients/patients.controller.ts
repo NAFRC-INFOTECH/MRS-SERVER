@@ -19,25 +19,25 @@ export class PatientsController {
     return this.svc.list(q);
   }
 
-  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'nurse' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'staff' as Role)
   @Get('paypoint/referred')
   async listPaypointReferred(@Query('q') q?: string) {
     return this.svc.listPaypointReferred(q);
   }
 
-  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'nurse' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'staff' as Role)
   @Get('nhia/referred')
   async listNHIAReferred(@Query('q') q?: string) {
     return this.svc.listNHIAReferred(q);
   }
 
-  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'nurse' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'staff' as Role)
   @Get('nhia/stats')
   async nhiaStats(@Query('period') period?: 'daily' | 'monthly' | 'yearly', @Query('value') value?: string) {
     return this.svc.getNHIAStatsByRange({ period, value });
   }
 
-  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'nurse' as Role, 'pharmacy' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'staff' as Role, 'pharmacy' as Role)
   @Get('pharmacy/referred')
   async listPharmacyReferred(@Query('q') q?: string) {
     return this.svc.listPharmacyReferred(q);
@@ -49,7 +49,7 @@ export class PatientsController {
     return this.svc.addToPharmacy(body.patientId, { prescription: body.prescription, drugs: body.drugs });
   }
 
-  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'pharmacy' as Role, 'nurse' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'pharmacy' as Role, 'staff' as Role)
   @Patch('pharmacy/:patientId/desk-state')
   async updatePharmacyDeskState(
     @Param('patientId') patientId: string,
@@ -65,14 +65,14 @@ export class PatientsController {
     return doc.toObject();
   }
 
-  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'nurse' as Role, 'pharmacy' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'staff' as Role, 'pharmacy' as Role)
   @Get(':id')
   async get(@Param('id') id: string) {
     const doc = await this.svc.findById(id);
     return doc ? doc.toObject() : null;
   }
 
-  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'nurse' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'recording' as Role, 'staff' as Role)
   @Patch(':id')
   async update(@Param('id') id: string, @Body() body: any) {
     const doc = await this.svc.update(id, body);

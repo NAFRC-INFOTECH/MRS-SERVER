@@ -5,13 +5,11 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { Role } from '../common/types/roles';
 import { UsersService } from '../users/users.service';
-import { Injectable } from '@nestjs/common';
 
 @ApiTags('staff')
 @ApiBearerAuth()
-@Controller({ path: 'nurses', version: '1' })
-@Injectable()
-export class NursesController {
+@Controller({ path: 'staff', version: '1' })
+export class StaffController {
   constructor(private readonly usersService: UsersService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,3 +28,4 @@ export class NursesController {
     });
   }
 }
+

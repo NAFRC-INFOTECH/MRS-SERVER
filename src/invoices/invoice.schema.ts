@@ -63,6 +63,15 @@ export class Invoice {
   @Prop({ trim: true, default: '' })
   createdByRole?: string;
 
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  paidByUserId?: Types.ObjectId;
+
+  @Prop({ trim: true, default: '' })
+  paidByRole?: string;
+
+  @Prop({ required: false })
+  paidAt?: Date;
+
   @Prop({ trim: true, required: true })
   patientName: string;
 

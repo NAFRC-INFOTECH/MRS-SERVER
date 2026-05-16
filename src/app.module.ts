@@ -24,6 +24,8 @@ import { DutiesModule } from './duties/duties.module';
 import { NursesModule } from './nurses/nurses.module';
 import { DoctorsModule } from './doctors/doctors.module';
 import { LabReferralsModule } from './lab-referrals/lab-referrals.module';
+import { XrayReferralsModule } from './xray-referrals/xray-referrals.module';
+import { StaffModule } from './staff/staff.module';
 import { PriceListModule } from './price-list/price-list.module';
 import { InvoicesModule } from './invoices/invoices.module';
 
@@ -106,6 +108,8 @@ import { InvoicesModule } from './invoices/invoices.module';
     NursesModule,
     DoctorsModule,
     LabReferralsModule,
+    XrayReferralsModule,
+    StaffModule,
     PriceListModule,
     InvoicesModule
   ],

@@ -58,7 +58,7 @@ export class AppMailerService {
     }
   }
 
-  async sendInvitation(email: string, token: string, role: 'Doctor' | 'Nurse'): Promise<{ ok: boolean; error?: string }> {
+  async sendInvitation(email: string, token: string, role: 'Doctor' | 'Nurse' | 'Staff'): Promise<{ ok: boolean; error?: string }> {
     const acceptUrl =
       this.frontendUrl
         ? `${this.frontendUrl}/invite/accept?token=${encodeURIComponent(token)}`

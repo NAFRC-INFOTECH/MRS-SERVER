@@ -28,6 +28,9 @@ export class DutyRecord {
   @Prop({ type: Types.ObjectId, ref: 'User', required: false })
   recordingUserId?: string;
 
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  radiologyUserId?: string;
+
   @Prop({ type: Types.ObjectId, ref: 'Department', required: true })
   departmentId: string;
 
@@ -54,14 +57,16 @@ export const DutyRecordSchema = SchemaFactory.createForClass(DutyRecord);
 DutyRecordSchema.index({ doctorUserId: 1, date: 1, shift: 1 }, { sparse: true });
 DutyRecordSchema.index({ nurseUserId: 1, date: 1, shift: 1 }, { sparse: true });
 DutyRecordSchema.index({ recordingUserId: 1, date: 1, shift: 1 }, { sparse: true });
+DutyRecordSchema.index({ radiologyUserId: 1, date: 1, shift: 1 }, { sparse: true });
 DutyRecordSchema.pre('validate', function (next) {
   const self = this as any;
   const hasDoctor = !!self.doctorUserId;
   const hasNurse = !!self.nurseUserId;
   const hasRecording = !!self.recordingUserId;
-  const count = [hasDoctor, hasNurse, hasRecording].filter(Boolean).length;
+  const hasRadiology = !!self.radiologyUserId;
+  const count = [hasDoctor, hasNurse, hasRecording, hasRadiology].filter(Boolean).length;
   if (count !== 1) {
-    return next(new Error('Exactly one of doctorUserId, nurseUserId, or recordingUserId must be set'));
+    return next(new Error('Exactly one of doctorUserId, nurseUserId, recordingUserId, or radiologyUserId must be set'));
   }
   const diff = self.timeOut.getTime() - self.timeIn.getTime();
 

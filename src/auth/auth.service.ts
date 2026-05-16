@@ -75,11 +75,13 @@ export class AuthService {
   async login(email: string, password: string) {
     const res = await this.validateUser(email, password);
     const { doc, isAdmin } = res as any;
-    const roles = Array.isArray(doc.roles) ? [...doc.roles] : [];
+    const roles = (Array.isArray(doc.roles) ? [...doc.roles] : []).map((r) =>
+      String(r).trim().toLowerCase() === 'nurse' ? 'staff' : r
+    );
     const role = roles[0];
-    if (!isAdmin && role === 'nurse') {
-      const okDuty = await this.dutiesService.isNurseOnDutyNow(doc.id);
-      if (!okDuty) throw new UnauthorizedException('Nurse not on active duty shift');
+    if (!isAdmin && role === 'staff') {
+      const okDuty = await this.dutiesService.isStaffOnDutyNow(doc.id);
+      if (!okDuty) throw new UnauthorizedException('Staff not on active duty shift');
     }
     if (!isAdmin && role === 'doctor') {
       const okDuty = await this.dutiesService.isDoctorOnDutyNow(doc.id);
@@ -96,7 +98,7 @@ export class AuthService {
     const refreshTokenHash = await this.passwordService.hash(tokens.refreshToken);
     if (isAdmin) await this.adminService.setRefreshToken(doc.id, refreshTokenHash);
     else await this.usersService.setRefreshToken(doc.id, refreshTokenHash);
-    const department = role === 'nurse' ? (doc as any).department : undefined;
+    const department = role === 'staff' ? (doc as any).department : undefined;
     return { ...tokens, department, role };
   }
 
@@ -172,7 +174,12 @@ export class AuthService {
     department?: string,
     name?: string
   ) {
-    const payload = { sub, email, roles, pv, department, name };
+    const normalizedRoles = (Array.isArray(roles) ? roles : [])
+      .map((r) => String(r).trim().toLowerCase())
+      .map((r) => (r === 'nurse' ? 'staff' : r))
+      .map((r) => (r === 'pharmacist' ? 'pharmacy' : r))
+      .filter(Boolean);
+    const payload = { sub, email, roles: normalizedRoles, pv, department, name };
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
       expiresIn: '24h'

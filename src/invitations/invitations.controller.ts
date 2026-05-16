@@ -33,9 +33,27 @@ export class InvitationsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('super_admin' as Role, 'admin' as Role)
+  @Post('staff')
+  async inviteStaff(@Req() req: { user: { userId: string } }, @Body() dto: { email: string }) {
+    const inv = await this.invitationsService.inviteStaff(dto.email, req.user?.userId);
+    return { token: inv.token, email: inv.email, role: inv.role, status: inv.status };
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role, 'admin' as Role)
+  @Post('staff/direct')
+  async createStaffDirect(@Body() dto: { name: string; email: string; department?: string }) {
+    const res = await this.invitationsService.createStaffDirect(dto.name, dto.email, dto.department);
+    return res; // { id, email, name, password }
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role, 'admin' as Role)
   @Post('nurse')
-  async inviteNurse(@Req() req: { user: { userId: string } }, @Body() dto: { email: string }) {
-    const inv = await this.invitationsService.inviteNurse(dto.email, req.user?.userId);
+  async inviteNurseLegacy(@Req() req: { user: { userId: string } }, @Body() dto: { email: string }) {
+    const inv = await this.invitationsService.inviteStaff(dto.email, req.user?.userId);
     return { token: inv.token, email: inv.email, role: inv.role, status: inv.status };
   }
 
@@ -43,8 +61,8 @@ export class InvitationsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('super_admin' as Role, 'admin' as Role)
   @Post('nurse/direct')
-  async createNurseDirect(@Body() dto: { name: string; email: string; department?: string }) {
-    const res = await this.invitationsService.createNurseDirect(dto.name, dto.email, dto.department);
+  async createNurseDirectLegacy(@Body() dto: { name: string; email: string; department?: string }) {
+    const res = await this.invitationsService.createStaffDirect(dto.name, dto.email, dto.department);
     return res; // { id, email, name, password }
   }
 
@@ -54,6 +72,15 @@ export class InvitationsController {
   @Post('recording/direct')
   async createRecordingDirect(@Body() dto: { name: string; email: string }) {
     const res = await this.invitationsService.createRecordingDirect(dto.name, dto.email);
+    return res; // { id, email, name, password }
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role, 'admin' as Role)
+  @Post('radiology/direct')
+  async createRadiologyDirect(@Body() dto: { name: string; email: string }) {
+    const res = await this.invitationsService.createRadiologyDirect(dto.name, dto.email);
     return res; // { id, email, name, password }
   }
 

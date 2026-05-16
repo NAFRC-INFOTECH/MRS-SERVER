@@ -32,6 +32,9 @@ export class PriceListSummary {
   services: number;
 
   @Prop({ default: 0 })
+  servicesValue: number;
+
+  @Prop({ default: 0 })
   totalValue: number;
 
   @Prop({ default: 0 })

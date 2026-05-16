@@ -68,6 +68,7 @@ export class PriceListController {
         drugs: 0,
         totalDrugs: 0,
         services: 0,
+        servicesValue: 0,
         totalValue: 0,
         totalDrugsInStock: 0,
         totalDrugsSold: 0,
@@ -113,7 +114,7 @@ export class PriceListController {
   }
 
   @Patch(':id/dispense')
-  @Roles('super_admin' as Role, 'admin' as Role, 'pharmacy' as Role, 'nurse' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'pharmacy' as Role, 'staff' as Role)
   async recordDispense(@Param('id') id: string, @Body() body: { quantity: number }) {
     return this.priceListService.recordDispense(id, body.quantity);
   }
