@@ -19,15 +19,22 @@ export class InvoicesController {
     'admin' as Role,
     'paypoint' as Role,
     'doctor' as Role,
-    'nurse' as Role,
+    'staff' as Role,
     'recording' as Role,
   )
   @Get()
-  async findAll(@Query('createdByRole') createdByRole?: string, @Query('createdByUserId') createdByUserId?: string) {
-    return this.invoicesService.findAll({ createdByRole, createdByUserId });
+  async findAll(
+    @Query('createdByRole') createdByRole?: string,
+    @Query('createdByUserId') createdByUserId?: string,
+    @Query('paymentStatus') paymentStatus?: PaymentStatus,
+    @Query('paidByRole') paidByRole?: string,
+    @Query('paidFrom') paidFrom?: string,
+    @Query('paidTo') paidTo?: string,
+  ) {
+    return this.invoicesService.findAll({ createdByRole, createdByUserId, paymentStatus, paidByRole, paidFrom, paidTo });
   }
 
-  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'pharmacy' as Role, 'nurse' as Role, 'recording' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'pharmacy' as Role, 'staff' as Role, 'recording' as Role)
   @Post()
   async create(@Req() req: any, @Body() body: { patientId: string; drugs?: any[]; items?: any[] }) {
     const createdByUserId = req?.user?.sub as string;
@@ -41,7 +48,7 @@ export class InvoicesController {
     'paypoint' as Role,
     'doctor' as Role,
     'pharmacy' as Role,
-    'nurse' as Role,
+    'staff' as Role,
     'recording' as Role,
   )
   @Get('patient/:patientId')
@@ -55,7 +62,7 @@ export class InvoicesController {
     'paypoint' as Role,
     'doctor' as Role,
     'pharmacy' as Role,
-    'nurse' as Role,
+    'staff' as Role,
     'recording' as Role,
   )
   @Get(':id')
@@ -68,14 +75,17 @@ export class InvoicesController {
     'admin' as Role,
     'paypoint' as Role,
     'doctor' as Role,
-    'nurse' as Role,
+    'staff' as Role,
     'recording' as Role,
   )
   @Patch(':id/payment-status')
   async updatePaymentStatus(
+    @Req() req: any,
     @Param('id') id: string,
     @Body() body: { paymentStatus: PaymentStatus },
   ) {
-    return this.invoicesService.updatePaymentStatus(id, body.paymentStatus);
+    const userId = req?.user?.sub as string;
+    const roles: string[] = (req?.user?.roles || []) as string[];
+    return this.invoicesService.updatePaymentStatus(id, body.paymentStatus, { userId, roles });
   }
 }

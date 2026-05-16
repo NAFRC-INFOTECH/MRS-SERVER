@@ -30,6 +30,7 @@ export class JwtAccessStrategy extends PassportStrategy(Strategy, 'jwt') {
           : [];
     const roles = rawRoles
       .map((r) => String(r).trim().toLowerCase())
+      .map((r) => (r === 'nurse' ? 'staff' : r))
       .map((r) => (r === 'pharmacist' ? 'pharmacy' : r))
       .filter(Boolean);
     return { userId: payload.sub, email: payload.email, roles, pv: payload.pv };

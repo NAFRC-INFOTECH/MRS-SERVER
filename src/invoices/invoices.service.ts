@@ -13,10 +13,18 @@ export class InvoicesService {
     private readonly rt: RealtimeGateway,
   ) {}
 
-  async findAll(filters?: { createdByRole?: string; createdByUserId?: string }): Promise<InvoiceDocument[]> {
+  async findAll(filters?: { createdByRole?: string; createdByUserId?: string; paymentStatus?: PaymentStatus; paidByRole?: string; paidFrom?: string; paidTo?: string }): Promise<InvoiceDocument[]> {
     const q: any = {};
     if (filters?.createdByRole) q.createdByRole = String(filters.createdByRole).trim();
     if (filters?.createdByUserId) q.createdByUserId = new Types.ObjectId(filters.createdByUserId);
+    if (filters?.paymentStatus) q.paymentStatus = filters.paymentStatus;
+    if (filters?.paidByRole) q.paidByRole = String(filters.paidByRole).trim();
+    if (filters?.paidFrom || filters?.paidTo) {
+      const range: any = {};
+      if (filters.paidFrom) range.$gte = new Date(filters.paidFrom);
+      if (filters.paidTo) range.$lt = new Date(filters.paidTo);
+      q.paidAt = range;
+    }
     return this.invoiceModel.find(q).sort({ createdAt: -1 }).lean();
   }
 
@@ -58,8 +66,8 @@ export class InvoicesService {
     const patientCardNumber = patient.serviceNumber || patient.membershipNumber || String(patient._id);
     const patientName = [patient.surname, patient.firstname, patient.middlename].filter(Boolean).join(' ');
 
-    const rolePriority = ['recording', 'paypoint', 'pharmacy', 'doctor', 'nurse', 'admin', 'super_admin'];
-    const roles = meta?.roles || [];
+    const rolePriority = ['recording', 'paypoint', 'pharmacy', 'doctor', 'staff', 'nurse', 'admin', 'super_admin'];
+    const roles = (meta?.roles || []).map((r) => (String(r).trim().toLowerCase() === 'nurse' ? 'staff' : r));
     const createdByRole = rolePriority.find((r) => roles.includes(r)) || (roles[0] || '');
 
     const invoice = new this.invoiceModel({
@@ -95,8 +103,22 @@ export class InvoicesService {
     return doc;
   }
 
-  async updatePaymentStatus(id: string, status: PaymentStatus): Promise<InvoiceDocument> {
-    const doc = await this.invoiceModel.findByIdAndUpdate(id, { paymentStatus: status }, { new: true });
+  async updatePaymentStatus(id: string, status: PaymentStatus, meta?: { userId?: string; roles?: string[] }): Promise<InvoiceDocument> {
+    const update: any = { paymentStatus: status };
+    if (status === PaymentStatus.PAID) {
+      const rolePriority = ['paypoint', 'recording', 'pharmacy', 'doctor', 'staff', 'nurse', 'admin', 'super_admin'];
+      const roles = (meta?.roles || []).map((r) => (String(r).trim().toLowerCase() === 'nurse' ? 'staff' : r));
+      const paidByRole = rolePriority.find((r) => roles.includes(r)) || (roles[0] || '');
+      update.paidAt = new Date();
+      update.paidByRole = paidByRole;
+      update.paidByUserId = meta?.userId ? new Types.ObjectId(meta.userId) : undefined;
+    } else {
+      update.paidAt = undefined;
+      update.paidByRole = '';
+      update.paidByUserId = undefined;
+    }
+
+    const doc = await this.invoiceModel.findByIdAndUpdate(id, update, { new: true });
     if (!doc) throw new NotFoundException('Invoice not found');
     this.rt.emit('invoice.updated', {
       id: String(doc._id),

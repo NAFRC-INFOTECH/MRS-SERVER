@@ -6,7 +6,7 @@ import { UsersService } from '../users/users.service';
 import { DepartmentsService } from '../departments/departments.service';
 
 type CreateDutyDto = {
-  role: 'doctor' | 'nurse' | 'recording';
+  role: 'doctor' | 'staff' | 'recording' | 'radiology';
   staffId?: string;
   staffIds?: string[];
   departmentId: string;
@@ -31,7 +31,10 @@ export class DutiesService implements OnModuleInit {
   }
 
   async create(dto: CreateDutyDto): Promise<DutyRecordDocument | { createdCount: number; duties: DutyRecordDocument[] }> {
-    if (!['doctor', 'nurse', 'recording'].includes(dto.role)) throw new BadRequestException('Invalid role');
+    const rawRole = String(dto.role || '').trim().toLowerCase();
+    const normalizedRole = (rawRole === 'nurse' ? 'staff' : rawRole) as CreateDutyDto['role'];
+    if (!['doctor', 'staff', 'recording', 'radiology'].includes(normalizedRole)) throw new BadRequestException('Invalid role');
+    dto.role = normalizedRole;
     const staffIds = Array.from(
       new Set([dto.staffId, ...(dto.staffIds || [])].filter((id): id is string => !!id && id.trim().length > 0))
     );
@@ -60,8 +63,9 @@ export class DutiesService implements OnModuleInit {
     if (staffIds.length === 1) {
       const doc = new this.dutyModel({
         doctorUserId: dto.role === 'doctor' ? staffIds[0] : undefined,
-        nurseUserId: dto.role === 'nurse' ? staffIds[0] : undefined,
+        nurseUserId: dto.role === 'staff' ? staffIds[0] : undefined,
         recordingUserId: dto.role === 'recording' ? staffIds[0] : undefined,
+        radiologyUserId: dto.role === 'radiology' ? staffIds[0] : undefined,
         departmentId: dto.departmentId,
         date,
         shift: dto.shift,
@@ -71,15 +75,16 @@ export class DutiesService implements OnModuleInit {
         assignedBy: dto.assignedBy
       });
       const saved = await doc.save();
-      if (dto.role === 'nurse') {
+      if (dto.role === 'staff') {
         await this.usersService.update(staffIds[0], { department: (okDept as any).name } as any);
       }
       return saved;
     }
     const docs = staffIds.map((staffId) => ({
       doctorUserId: dto.role === 'doctor' ? staffId : undefined,
-      nurseUserId: dto.role === 'nurse' ? staffId : undefined,
+      nurseUserId: dto.role === 'staff' ? staffId : undefined,
       recordingUserId: dto.role === 'recording' ? staffId : undefined,
+      radiologyUserId: dto.role === 'radiology' ? staffId : undefined,
       departmentId: dto.departmentId,
       date,
       shift: dto.shift,
@@ -89,7 +94,7 @@ export class DutiesService implements OnModuleInit {
       assignedBy: dto.assignedBy
     }));
     const saved = await this.dutyModel.insertMany(docs);
-    if (dto.role === 'nurse') {
+    if (dto.role === 'staff') {
       await Promise.all(
         staffIds.map((staffId) => this.usersService.update(staffId, { department: (okDept as any).name } as any))
       );
@@ -97,11 +102,12 @@ export class DutiesService implements OnModuleInit {
     return { createdCount: saved.length, duties: saved };
   }
 
-  async list(filters: { role?: 'doctor' | 'nurse' | 'recording'; departmentId?: string; date?: string; shift?: Shift }) {
+  async list(filters: { role?: 'doctor' | 'staff' | 'recording' | 'radiology'; departmentId?: string; date?: string; shift?: Shift }) {
     const q: any = {};
     if (filters.role === 'doctor') q.doctorUserId = { $ne: null };
-    if (filters.role === 'nurse') q.nurseUserId = { $ne: null };
+    if (filters.role === 'staff') q.nurseUserId = { $ne: null };
     if (filters.role === 'recording') q.recordingUserId = { $ne: null };
+    if (filters.role === 'radiology') q.radiologyUserId = { $ne: null };
     if (filters.departmentId) q.departmentId = filters.departmentId;
     if (filters.date) {
       const d = new Date(filters.date);
@@ -140,6 +146,10 @@ export class DutiesService implements OnModuleInit {
   }
 
   async isNurseOnDutyNow(nurseUserId: string): Promise<boolean> {
+    return this.isStaffOnDutyNow(nurseUserId);
+  }
+
+  async isStaffOnDutyNow(staffUserId: string): Promise<boolean> {
     const now = new Date();
     const h = now.getHours();
     const isMorning = h >= 8 && h < 14;
@@ -158,7 +168,7 @@ export class DutiesService implements OnModuleInit {
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
     const duty = await this.dutyModel.findOne({
-      nurseUserId,
+      nurseUserId: staffUserId,
       date: { $gte: dayStart, $lt: dayEnd },
       shift,
       status: DutyStatus.ON_DUTY

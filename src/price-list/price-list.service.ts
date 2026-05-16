@@ -154,6 +154,7 @@ export class PriceListService implements OnModuleInit {
     let drugs = 0;
     let services = 0;
     let totalValue = 0;
+    let servicesValue = 0;
 
     if (Array.isArray(items)) {
       totalItems = items.length;
@@ -165,6 +166,7 @@ export class PriceListService implements OnModuleInit {
           activeItems++;
           const price = Number(item.price) || 0;
           totalValue += price;
+          if (item.category !== 'drug') servicesValue += price;
         }
 
         if (item.category === 'drug') {
@@ -198,6 +200,7 @@ export class PriceListService implements OnModuleInit {
       drugs,
       totalDrugs: drugs,
       services,
+      servicesValue,
       totalValue,
       totalDrugsInStock,
       totalDrugsSold,

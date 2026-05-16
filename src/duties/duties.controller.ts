@@ -17,28 +17,28 @@ export class DutiesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('super_admin' as Role, 'admin' as Role, 'recording' as Role)
   @Post()
-  async create(@Body() body: { role: 'doctor' | 'nurse' | 'recording'; staffId?: string; staffIds?: string[]; departmentId: string; date: string; shift: Shift; timeIn: string; timeOut: string; status: DutyStatus; assignedBy: string; }) {
+  async create(@Body() body: { role: 'doctor' | 'staff' | 'recording' | 'radiology'; staffId?: string; staffIds?: string[]; departmentId: string; date: string; shift: Shift; timeIn: string; timeOut: string; status: DutyStatus; assignedBy: string; }) {
     return this.svc.create(body);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Get()
-  async list(@Query() query: { role?: 'doctor' | 'nurse' | 'recording'; departmentId?: string; date?: string; shift?: Shift }) {
+  async list(@Query() query: { role?: 'doctor' | 'staff' | 'recording' | 'radiology'; departmentId?: string; date?: string; shift?: Shift }) {
     return this.svc.list(query);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role, 'admin' as Role, 'recording' as Role, 'nurse' as Role, 'doctor' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'recording' as Role, 'staff' as Role, 'doctor' as Role, 'radiology' as Role)
   @Patch(':id')
   async update(@Param('id') id: string, @Body() body: Partial<{ departmentId: string; date: string; shift: Shift; timeIn: string; timeOut: string; status: DutyStatus }>, @Req() req: any) {
     const duty = await this.svc.getById(id);
     if (!duty) throw new ForbiddenException('Duty not found');
     const roles: string[] = (req.user?.roles || []) as string[];
     const userId: string = req.user?.sub;
-    if (roles.includes('nurse') && String(duty.nurseUserId) !== String(userId)) {
-      throw new ForbiddenException('Cannot edit other nurse duty');
+    if (roles.includes('staff') && String(duty.nurseUserId) !== String(userId)) {
+      throw new ForbiddenException('Cannot edit other staff duty');
     }
     if (roles.includes('doctor') && String(duty.doctorUserId) !== String(userId)) {
       throw new ForbiddenException('Cannot edit other doctor duty');
@@ -46,26 +46,32 @@ export class DutiesController {
     if (roles.includes('recording') && String(duty.recordingUserId) !== String(userId)) {
       throw new ForbiddenException('Cannot edit other recording staff duty');
     }
+    if (roles.includes('radiology') && String((duty as any).radiologyUserId) !== String(userId)) {
+      throw new ForbiddenException('Cannot edit other radiology duty');
+    }
     return this.svc.update(id, body);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin' as Role, 'admin' as Role, 'recording' as Role, 'nurse' as Role, 'doctor' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'recording' as Role, 'staff' as Role, 'doctor' as Role, 'radiology' as Role)
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req: any) {
     const duty = await this.svc.getById(id);
     if (!duty) throw new ForbiddenException('Duty not found');
     const roles: string[] = (req.user?.roles || []) as string[];
     const userId: string = req.user?.sub;
-    if (roles.includes('nurse') && String(duty.nurseUserId) !== String(userId)) {
-      throw new ForbiddenException('Cannot delete other nurse duty');
+    if (roles.includes('staff') && String(duty.nurseUserId) !== String(userId)) {
+      throw new ForbiddenException('Cannot delete other staff duty');
     }
     if (roles.includes('doctor') && String(duty.doctorUserId) !== String(userId)) {
       throw new ForbiddenException('Cannot delete other doctor duty');
     }
     if (roles.includes('recording') && String(duty.recordingUserId) !== String(userId)) {
       throw new ForbiddenException('Cannot delete other recording staff duty');
+    }
+    if (roles.includes('radiology') && String((duty as any).radiologyUserId) !== String(userId)) {
+      throw new ForbiddenException('Cannot delete other radiology duty');
     }
     return this.svc.remove(id);
   }

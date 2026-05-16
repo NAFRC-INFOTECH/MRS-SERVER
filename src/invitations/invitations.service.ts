@@ -43,21 +43,25 @@ export class InvitationsService {
   }
 
   async inviteNurse(email: string, invitedBy?: string): Promise<InvitationDocument> {
-    const existingPending = await this.invitationModel.findOne({ email, role: 'nurse', status: 'pending' });
+    return this.inviteStaff(email, invitedBy);
+  }
+
+  async inviteStaff(email: string, invitedBy?: string): Promise<InvitationDocument> {
+    const existingPending = await this.invitationModel.findOne({ email, role: { $in: ['staff', 'nurse'] }, status: 'pending' });
     if (existingPending) {
-      this.logger.log(`Resending invitation to existing pending nurse invite for ${email}`);
-      const res = await this.mailer.sendInvitation(email, existingPending.token, 'Nurse');
+      this.logger.log(`Resending invitation to existing pending staff invite for ${email}`);
+      const res = await this.mailer.sendInvitation(email, existingPending.token, 'Staff');
       if (!res.ok) throw new ServiceUnavailableException(res.error || 'Failed to send invitation email');
-      this.rt.emitToRole('super_admin', 'invitation.resend', { email, role: 'nurse' });
+      this.rt.emitToRole('super_admin', 'invitation.resend', { email, role: 'staff' });
       return existingPending;
     }
     const token = generateInvitationToken();
-    const res = await this.mailer.sendInvitation(email, token, 'Nurse');
+    const res = await this.mailer.sendInvitation(email, token, 'Staff');
     if (!res.ok) throw new ServiceUnavailableException(res.error || 'Failed to send invitation email');
-    const inv = new this.invitationModel({ email, role: 'nurse', token, status: 'pending', invitedBy });
+    const inv = new this.invitationModel({ email, role: 'staff', token, status: 'pending', invitedBy });
     const saved = await inv.save();
-    this.logger.log(`Nurse invitation record created for ${email} (token: ${token.slice(0, 8)}...)`);
-    this.rt.emitToRole('super_admin', 'invitation.created', { email, role: 'nurse' });
+    this.logger.log(`Staff invitation record created for ${email} (token: ${token.slice(0, 8)}...)`);
+    this.rt.emitToRole('super_admin', 'invitation.created', { email, role: 'staff' });
     return saved;
   }
 
@@ -77,9 +81,13 @@ export class InvitationsService {
   }
 
   async createNurseDirect(name: string, email: string, department?: string) {
+    return this.createStaffDirect(name, email, department);
+  }
+
+  async createStaffDirect(name: string, email: string, department?: string) {
     const password = this.generateRandomPassword();
     const user = await this.usersService.create({ name, email, password, department });
-    await this.usersService.assignRoles(user.id, ['nurse']);
+    await this.usersService.assignRoles(user.id, ['staff']);
     return { id: user.id, email: user.email, name: user.name, password };
   }
 
@@ -87,6 +95,13 @@ export class InvitationsService {
     const password = this.generateRandomPassword();
     const user = await this.usersService.create({ name, email, password } as any);
     await this.usersService.assignRoles(user.id, ['recording']);
+    return { id: user.id, email: user.email, name: user.name, password };
+  }
+
+  async createRadiologyDirect(name: string, email: string) {
+    const password = this.generateRandomPassword();
+    const user = await this.usersService.create({ name, email, password } as any);
+    await this.usersService.assignRoles(user.id, ['radiology']);
     return { id: user.id, email: user.email, name: user.name, password };
   }
 
@@ -117,7 +132,7 @@ export class InvitationsService {
     }
     const role = inv.role || 'doctor';
     const patch: any = { name: name || inv.email.split('@')[0], email: inv.email, password };
-    if (role === 'nurse') patch.department = 'GOPD';
+    if (role === 'staff') patch.department = 'GOPD';
     const user = await this.usersService.create(patch);
     await this.usersService.assignRoles(user.id, [...(user.roles || []), role]);
     inv.status = 'accepted';

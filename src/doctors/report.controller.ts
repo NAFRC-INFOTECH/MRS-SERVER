@@ -13,7 +13,7 @@ import { ReportService } from './report.service';
 export class ReportController {
   constructor(private readonly svc: ReportService) {}
 
-  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role, 'admin' as Role)
+  @Roles('doctor' as Role, 'staff' as Role, 'super_admin' as Role, 'admin' as Role)
   @Post()
   async add(
     @Req() req: any,
@@ -41,13 +41,13 @@ export class ReportController {
     });
   }
 
-  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role, 'admin' as Role, 'recording' as Role)
+  @Roles('doctor' as Role, 'staff' as Role, 'super_admin' as Role, 'admin' as Role, 'recording' as Role)
   @Get()
   async list(@Query('patientId') patientId: string) {
     return this.svc.list(patientId);
   }
 
-  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role, 'admin' as Role)
+  @Roles('doctor' as Role, 'staff' as Role, 'super_admin' as Role, 'admin' as Role)
   @Put(':id')
   async update(@Param('id') id: string, @Body() body: { text?: string; clinicalNote?: string; diagnosis?: string; imageUrl?: string }) {
     return this.svc.update(id, {
@@ -58,7 +58,7 @@ export class ReportController {
     });
   }
 
-  @Roles('doctor' as Role, 'nurse' as Role, 'super_admin' as Role, 'admin' as Role)
+  @Roles('doctor' as Role, 'staff' as Role, 'super_admin' as Role, 'admin' as Role)
   @Delete(':id')
   async remove(@Param('id') id: string) {
     return this.svc.remove(id);

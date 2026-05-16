@@ -53,6 +53,11 @@ export class UsersService {
     return this.userModel.find({ roles: role }).lean();
   }
 
+  async findByAnyRole(roles: string[]): Promise<UserDocument[]> {
+    const list = Array.isArray(roles) ? roles.map((r) => String(r).trim()).filter(Boolean) : [];
+    return this.userModel.find({ roles: { $in: list } }).lean();
+  }
+
   async findAll(): Promise<UserDocument[]> {
     return this.userModel.find({}).lean();
   }

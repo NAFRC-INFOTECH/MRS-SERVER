@@ -13,7 +13,7 @@ import { DayListService } from './daylist.service';
 export class DayListController {
   constructor(private readonly svc: DayListService) {}
 
-  @Roles('nurse' as Role, 'super_admin' as Role)
+  @Roles('staff' as Role, 'super_admin' as Role)
   @Post()
   async add(@Body() body: { patientId: string; sourceDepartment?: string }) {
     return this.svc.add(body.patientId, undefined, body.sourceDepartment);
