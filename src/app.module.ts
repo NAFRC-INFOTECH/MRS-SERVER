@@ -28,6 +28,7 @@ import { XrayReferralsModule } from './xray-referrals/xray-referrals.module';
 import { StaffModule } from './staff/staff.module';
 import { PriceListModule } from './price-list/price-list.module';
 import { InvoicesModule } from './invoices/invoices.module';
+import { HealthModule } from './health/health.module';
 
 // import { AdminModule } from './admin/admin.module';
 
@@ -39,12 +40,14 @@ import { InvoicesModule } from './invoices/invoices.module';
         NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
         PORT: Joi.number().default(8000),
         CORS_ORIGIN: Joi.string().optional(),
-        MONGO_URI: Joi.string().when('NODE_ENV', {
-          is: 'production',
+        USE_INMEMORY_MONGO: Joi.boolean().default(true),
+        MONGO_URI: Joi.string().when('USE_INMEMORY_MONGO', {
+          is: false,
           then: Joi.string().required(),
           otherwise: Joi.string().optional()
         }),
-        USE_INMEMORY_MONGO: Joi.boolean().default(true),
+        PRISMA_ENABLED: Joi.boolean().default(false),
+        DATABASE_URL: Joi.string().optional(),
         JWT_ACCESS_SECRET: Joi.string().required(),
         JWT_REFRESH_SECRET: Joi.string().required(),
         PEPPER_SECRET: Joi.string().required(),
@@ -76,6 +79,9 @@ import { InvoicesModule } from './invoices/invoices.module';
         if ((!uri || uri.length === 0) && useMemory) {
           const mongod = await MongoMemoryServer.create();
           uri = mongod.getUri();
+        }
+        if (!uri || uri.length === 0) {
+          throw new Error('MONGO_URI is required (or set USE_INMEMORY_MONGO=true)');
         }
         return {
           uri,
@@ -111,7 +117,8 @@ import { InvoicesModule } from './invoices/invoices.module';
     XrayReferralsModule,
     StaffModule,
     PriceListModule,
-    InvoicesModule
+    InvoicesModule,
+    HealthModule
   ],
   providers: [
     {
