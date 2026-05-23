@@ -5,20 +5,31 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { Role } from '../common/types/roles';
+import { CommandBus } from '@nestjs/cqrs';
 import { DutiesService } from './duties.service';
 import { Shift, DutyStatus } from './duty.schema';
+import { CreateDutyCommand, DeleteDutyCommand, UpdateDutyCommand } from './cqrs/duties.commands';
+import { DutiesReplayService } from './projection/duties-replay.service';
 
 @ApiTags('duties')
 @Controller({ path: 'duties', version: '1' })
 export class DutiesController {
-  constructor(private readonly svc: DutiesService) {}
+  constructor(
+    private readonly svc: DutiesService,
+    private readonly commandBus: CommandBus,
+    private readonly replay: DutiesReplayService
+  ) {}
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('super_admin' as Role, 'admin' as Role, 'recording' as Role)
   @Post()
-  async create(@Body() body: { role: 'doctor' | 'staff' | 'recording' | 'radiology'; staffId?: string; staffIds?: string[]; departmentId: string; date: string; shift: Shift; timeIn: string; timeOut: string; status: DutyStatus; assignedBy: string; }) {
-    return this.svc.create(body);
+  async create(
+    @Req() req: any,
+    @Body() body: { role: 'doctor' | 'staff' | 'recording' | 'radiology'; staffId?: string; staffIds?: string[]; departmentId: string; date: string; shift: Shift; timeIn: string; timeOut: string; status: DutyStatus; assignedBy: string; }
+  ) {
+    const meta = { userId: req?.user?.sub as string, roles: (req?.user?.roles || []) as string[] };
+    return this.commandBus.execute(new CreateDutyCommand(body, meta));
   }
 
   @ApiBearerAuth()
@@ -49,7 +60,8 @@ export class DutiesController {
     if (roles.includes('radiology') && String((duty as any).radiologyUserId) !== String(userId)) {
       throw new ForbiddenException('Cannot edit other radiology duty');
     }
-    return this.svc.update(id, body);
+    const meta = { userId, roles };
+    return this.commandBus.execute(new UpdateDutyCommand(id, body, meta));
   }
 
   @ApiBearerAuth()
@@ -73,6 +85,15 @@ export class DutiesController {
     if (roles.includes('radiology') && String((duty as any).radiologyUserId) !== String(userId)) {
       throw new ForbiddenException('Cannot delete other radiology duty');
     }
-    return this.svc.remove(id);
+    const meta = { userId, roles };
+    return this.commandBus.execute(new DeleteDutyCommand(id, meta));
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role)
+  @Post('replay')
+  async replayProjection() {
+    return this.replay.rebuildFromEvents();
   }
 }

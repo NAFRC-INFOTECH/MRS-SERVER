@@ -261,4 +261,29 @@ export class PatientsService {
       patientQueue: res.patientQueue,
     });
   }
+
+  async getNHIAAccess(patientId: string) {
+    const doc = await this.model.findById(patientId).lean();
+    if (!doc) throw new NotFoundException('Patient not found');
+
+    const statusRaw = String((doc as any).nhiaStatus || '').trim().toLowerCase();
+    const inDesk = String((doc as any).patientQueue || '').trim().toLowerCase() === 'nhia' || String((doc as any).patientStatus || '').trim().toLowerCase() === 'nhia';
+    const updatedAt = (doc as any).nhiaUpdatedAt || null;
+
+    const status =
+      statusRaw === 'cleared'
+        ? 'cleared'
+        : statusRaw === 'not_cleared'
+          ? 'not_cleared'
+          : inDesk || statusRaw === 'awaiting'
+            ? 'awaiting'
+            : 'unknown';
+
+    return {
+      patientId: String((doc as any)._id || patientId),
+      status,
+      hasAccess: status === 'cleared',
+      updatedAt
+    };
+  }
 }

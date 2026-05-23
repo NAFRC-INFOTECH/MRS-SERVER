@@ -41,7 +41,7 @@ export class ReportController {
     });
   }
 
-  @Roles('doctor' as Role, 'staff' as Role, 'super_admin' as Role, 'admin' as Role, 'recording' as Role)
+  @Roles('doctor' as Role, 'clinical' as Role, 'staff' as Role, 'super_admin' as Role, 'admin' as Role, 'recording' as Role)
   @Get()
   async list(@Query('patientId') patientId: string) {
     return this.svc.list(patientId);

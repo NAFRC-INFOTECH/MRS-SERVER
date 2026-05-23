@@ -84,6 +84,15 @@ export class InvitationsController {
     return res; // { id, email, name, password }
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin' as Role, 'admin' as Role)
+  @Post('clinical/direct')
+  async createClinicalDirect(@Body() dto: { name: string; email: string; department: string }) {
+    const res = await this.invitationsService.createClinicalDirect(dto.name, dto.email, dto.department);
+    return res; // { id, email, name, password }
+  }
+
   @Get(':token')
   async verifyInvitation(@Param('token') token: string) {
     const inv = await this.invitationsService.findByToken(token);

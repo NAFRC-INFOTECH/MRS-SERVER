@@ -29,6 +29,8 @@ import { StaffModule } from './staff/staff.module';
 import { PriceListModule } from './price-list/price-list.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { HealthModule } from './health/health.module';
+import { EventsModule } from './events/events.module';
+import { ClinicalModule } from './clinical/clinical.module';
 
 // import { AdminModule } from './admin/admin.module';
 
@@ -118,7 +120,9 @@ import { HealthModule } from './health/health.module';
     StaffModule,
     PriceListModule,
     InvoicesModule,
-    HealthModule
+    ClinicalModule,
+    HealthModule,
+    EventsModule
   ],
   providers: [
     {

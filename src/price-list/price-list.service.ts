@@ -318,4 +318,25 @@ export class PriceListService implements OnModuleInit {
     );
     return summary;
   }
+
+  async getTopSellingDrugs(opts?: { limit?: number; activeOnly?: boolean }) {
+    const limit = Math.min(Math.max(Number(opts?.limit || 5), 1), 50);
+    const filter: any = { category: 'drug', soldQuantity: { $gt: 0 } };
+    if (opts?.activeOnly) filter.isActive = true;
+    const docs = await this.priceItemModel
+      .find(filter)
+      .sort({ soldQuantity: -1, name: 1 })
+      .limit(limit)
+      .lean()
+      .exec();
+    return docs.map((d: any) => ({
+      _id: String(d._id || ''),
+      name: d.name || '',
+      soldQuantity: Number(d.soldQuantity || 0),
+      stockQuantity: Number(d.stockQuantity || 0),
+      price: Number(d.price || 0),
+      isActive: !!d.isActive,
+      unit: d.unit || ''
+    }));
+  }
 }

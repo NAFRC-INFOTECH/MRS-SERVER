@@ -96,6 +96,15 @@ export class PriceListController {
     }
   }
 
+  @Get('top-selling/drugs')
+  @Roles('super_admin', 'admin')
+  async topSellingDrugs(@Query('limit') limit?: string, @Query('activeOnly') activeOnly?: string) {
+    return this.priceListService.getTopSellingDrugs({
+      limit: limit ? Number(limit) : undefined,
+      activeOnly: activeOnly === 'true',
+    });
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.priceListService.findOne(id);
