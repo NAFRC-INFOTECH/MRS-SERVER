@@ -4,15 +4,22 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { Role } from '../common/types/roles';
+import { CommandBus } from '@nestjs/cqrs';
 import { InvoicesService } from './invoices.service';
 import { PaymentStatus } from './invoice.schema';
+import { CreateInvoiceCommand, UpdateInvoicePaymentStatusCommand } from './cqrs/invoices.commands';
+import { InvoicesReplayService } from './projection/invoices-replay.service';
 
 @ApiTags('Invoices')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller({ path: 'invoices', version: '1' })
 export class InvoicesController {
-  constructor(private readonly invoicesService: InvoicesService) {}
+  constructor(
+    private readonly invoicesService: InvoicesService,
+    private readonly commandBus: CommandBus,
+    private readonly replay: InvoicesReplayService
+  ) {}
 
   @Roles(
     'super_admin' as Role,
@@ -39,7 +46,7 @@ export class InvoicesController {
   async create(@Req() req: any, @Body() body: { patientId: string; drugs?: any[]; items?: any[] }) {
     const createdByUserId = req?.user?.sub as string;
     const roles: string[] = (req?.user?.roles || []) as string[];
-    return this.invoicesService.create(body.patientId, { drugs: body.drugs, items: body.items }, { createdByUserId, roles });
+    return this.commandBus.execute(new CreateInvoiceCommand(body, { userId: createdByUserId, roles }));
   }
 
   @Roles(
@@ -86,6 +93,12 @@ export class InvoicesController {
   ) {
     const userId = req?.user?.sub as string;
     const roles: string[] = (req?.user?.roles || []) as string[];
-    return this.invoicesService.updatePaymentStatus(id, body.paymentStatus, { userId, roles });
+    return this.commandBus.execute(new UpdateInvoicePaymentStatusCommand(id, body.paymentStatus, { userId, roles }));
+  }
+
+  @Roles('super_admin' as Role)
+  @Post('replay')
+  async replayProjection() {
+    return this.replay.rebuildFromEvents();
   }
 }

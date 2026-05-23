@@ -105,6 +105,17 @@ export class InvitationsService {
     return { id: user.id, email: user.email, name: user.name, password };
   }
 
+  async createClinicalDirect(name: string, email: string, department: string) {
+    const deptRaw = String(department || '').trim();
+    if (!deptRaw) throw new BadRequestException('department is required');
+    const dept = deptRaw.toLowerCase() === 'eardoctor' ? 'EarDoctor' : deptRaw.toLowerCase() === 'eyedoctor' ? 'EyeDoctor' : '';
+    if (!dept) throw new BadRequestException('department must be EarDoctor or EyeDoctor');
+    const password = this.generateRandomPassword();
+    const user = await this.usersService.create({ name, email, password, department: dept } as any);
+    await this.usersService.assignRoles(user.id, ['clinical']);
+    return { id: user.id, email: user.email, name: user.name, password };
+  }
+
   private generateRandomPassword(): string {
     // 12+ chars, mixed alphanumerics
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&';
