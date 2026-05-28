@@ -10,6 +10,9 @@ export class Department {
 
   @Prop({ trim: true })
   description?: string;
+
+  @Prop({ type: Number })
+  bedCapacity?: number;
 }
 
 export const DepartmentSchema = SchemaFactory.createForClass(Department);

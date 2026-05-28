@@ -23,9 +23,16 @@ export class InvoicesReplayService {
         const invoice = (e.payload || {}).invoice;
         if (!invoice?._id) continue;
         await this.invoiceModel.updateOne({ _id: invoice._id }, { $set: invoice }, { upsert: true });
+      } else if (e.eventType === 'InvoiceNHIAStamped') {
+        const invoice = (e.payload || {}).invoice;
+        if (!invoice?._id) continue;
+        await this.invoiceModel.updateOne({ _id: invoice._id }, { $set: invoice }, { upsert: true });
+      } else if (e.eventType === 'InvoiceNHIACopayPaid') {
+        const invoice = (e.payload || {}).invoice;
+        if (!invoice?._id) continue;
+        await this.invoiceModel.updateOne({ _id: invoice._id }, { $set: invoice }, { upsert: true });
       }
     }
     return { ok: true };
   }
 }
-

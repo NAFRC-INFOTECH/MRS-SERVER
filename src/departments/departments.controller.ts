@@ -29,7 +29,7 @@ export class DepartmentsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('super_admin' as Role, 'admin' as Role)
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() body: { name?: string; description?: string }) {
+  async update(@Param('id') id: string, @Body() body: { name?: string; description?: string; bedCapacity?: number }) {
     return this.svc.update(id, body);
   }
 

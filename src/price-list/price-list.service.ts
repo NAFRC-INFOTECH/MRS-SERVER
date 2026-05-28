@@ -57,6 +57,11 @@ export class PriceListService implements OnModuleInit {
     this.validatePrice(dto.price);
     this.validateQuantity(dto.stockQuantity);
     this.validateQuantity(dto.soldQuantity);
+    if (String(dto.category || '').trim().toLowerCase() === 'bed') {
+      this.validateBedQuantity(dto.stockQuantity);
+      this.validateBedUsed(dto.soldQuantity, dto.stockQuantity);
+      await this.ensureUniqueBedWard(dto.name, undefined);
+    }
 
     const doc = new this.priceItemModel({
       name: dto.name.trim(),
@@ -76,6 +81,9 @@ export class PriceListService implements OnModuleInit {
   }
 
   async update(id: string, dto: UpdatePriceItemDto): Promise<PriceItemDocument> {
+    const current = await this.priceItemModel.findById(id).lean();
+    if (!current) throw new NotFoundException('Price item not found');
+
     const update: any = {};
 
     if (dto.name !== undefined) update.name = dto.name.trim();
@@ -95,6 +103,16 @@ export class PriceListService implements OnModuleInit {
     if (dto.soldQuantity !== undefined) {
       this.validateQuantity(dto.soldQuantity);
       update.soldQuantity = dto.soldQuantity;
+    }
+
+    const nextCategory = String((dto.category ?? (current as any).category) || '').trim().toLowerCase();
+    if (nextCategory === 'bed') {
+      const nextStock = dto.stockQuantity ?? (current as any).stockQuantity;
+      const nextUsed = dto.soldQuantity ?? (current as any).soldQuantity;
+      this.validateBedQuantity(nextStock);
+      this.validateBedUsed(nextUsed, nextStock);
+      const nextName = String(dto.name ?? (current as any).name ?? '');
+      await this.ensureUniqueBedWard(nextName, String((current as any)._id || id));
     }
 
     const doc = await this.priceItemModel.findByIdAndUpdate(id, update, { new: true });
@@ -148,6 +166,102 @@ export class PriceListService implements OnModuleInit {
     }
   }
 
+  private validateBedQuantity(quantity?: number) {
+    const q = Number(quantity);
+    if (!Number.isFinite(q) || !Number.isInteger(q)) {
+      throw new BadRequestException('Bed quantity must be an integer');
+    }
+    if (q < 5 || q > 50) {
+      throw new BadRequestException('Bed quantity must be between 5 and 50');
+    }
+  }
+
+  private validateBedUsed(used?: number, stock?: number) {
+    const u = Number(used ?? 0);
+    const s = Number(stock ?? 0);
+    if (!Number.isFinite(u) || !Number.isInteger(u) || u < 0) {
+      throw new BadRequestException('Used beds must be a non-negative integer');
+    }
+    if (!Number.isFinite(s) || !Number.isInteger(s) || s < 0) {
+      throw new BadRequestException('In-stock beds must be a non-negative integer');
+    }
+    if (u > s) {
+      throw new BadRequestException('Used beds cannot exceed in-stock beds');
+    }
+  }
+
+  private extractBedWardKey(name: string) {
+    const n = String(name || '')
+      .toLowerCase()
+      .replace(/[^a-z]/g, '');
+    if (n.includes('malevip')) return 'MaleVIP';
+    if (n.includes('femalevip')) return 'FemaleVIP';
+    if (n.includes('childrenward') || n.includes('children')) return 'ChildrenWard';
+    if (n.includes('maleward')) return 'MaleWard';
+    if (n.includes('femaleward')) return 'FemaleWard';
+    return '';
+  }
+
+  private async ensureUniqueBedWard(name: string, currentId?: string) {
+    const key = this.extractBedWardKey(name);
+    if (!key) return;
+    const list = await this.priceItemModel
+      .find({ category: { $regex: /^bed$/i } })
+      .select({ _id: 1, name: 1 })
+      .lean()
+      .exec();
+    const conflict = list.find((it: any) => {
+      const id = String(it?._id || '');
+      if (currentId && id === String(currentId)) return false;
+      return this.extractBedWardKey(String(it?.name || '')) === key;
+    });
+    if (conflict) {
+      throw new BadRequestException(`Bed fee for ${key} already exists`);
+    }
+  }
+
+  async occupyBed(id: string, quantity: number): Promise<PriceItemDocument> {
+    const q = Number(quantity);
+    if (!Number.isFinite(q) || !Number.isInteger(q) || q <= 0) {
+      throw new BadRequestException('Quantity must be a positive integer');
+    }
+    const item = await this.priceItemModel.findById(id);
+    if (!item) throw new NotFoundException('Price item not found');
+    if (String(item.category || '').trim().toLowerCase() !== 'bed') {
+      throw new BadRequestException('Item is not a bed fee');
+    }
+    const stock = Number(item.stockQuantity || 0);
+    this.validateBedQuantity(stock);
+    const used = Number(item.soldQuantity || 0);
+    const nextUsed = used + q;
+    this.validateBedUsed(nextUsed, stock);
+    item.soldQuantity = nextUsed;
+    await item.save();
+    await this.recalculateAllSummaries();
+    return item;
+  }
+
+  async releaseBed(id: string, quantity: number): Promise<PriceItemDocument> {
+    const q = Number(quantity);
+    if (!Number.isFinite(q) || !Number.isInteger(q) || q <= 0) {
+      throw new BadRequestException('Quantity must be a positive integer');
+    }
+    const item = await this.priceItemModel.findById(id);
+    if (!item) throw new NotFoundException('Price item not found');
+    if (String(item.category || '').trim().toLowerCase() !== 'bed') {
+      throw new BadRequestException('Item is not a bed fee');
+    }
+    const stock = Number(item.stockQuantity || 0);
+    this.validateBedQuantity(stock);
+    const used = Number(item.soldQuantity || 0);
+    const nextUsed = used - q;
+    this.validateBedUsed(nextUsed, stock);
+    item.soldQuantity = nextUsed;
+    await item.save();
+    await this.recalculateAllSummaries();
+    return item;
+  }
+
   private calculateSummaryFromItems(items: any[], period: SummaryPeriod, referenceDate: string) {
     let totalItems = 0;
     let activeItems = 0;
@@ -165,8 +279,12 @@ export class PriceListService implements OnModuleInit {
         if (item.isActive) {
           activeItems++;
           const price = Number(item.price) || 0;
-          totalValue += price;
-          if (item.category !== 'drug') servicesValue += price;
+          const multiplier =
+            item.category === 'drug' || String(item.category || '').trim().toLowerCase() === 'bed'
+              ? Number(item.stockQuantity) || 0
+              : 1;
+          totalValue += price * multiplier;
+          if (item.category !== 'drug') servicesValue += price * multiplier;
         }
 
         if (item.category === 'drug') {

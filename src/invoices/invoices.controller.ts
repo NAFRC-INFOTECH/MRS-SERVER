@@ -6,8 +6,13 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import type { Role } from '../common/types/roles';
 import { CommandBus } from '@nestjs/cqrs';
 import { InvoicesService } from './invoices.service';
-import { PaymentStatus } from './invoice.schema';
-import { CreateInvoiceCommand, UpdateInvoicePaymentStatusCommand } from './cqrs/invoices.commands';
+import { BillingRoute, CopayStatus, NHIAStampStatus, PaymentStatus } from './invoice.schema';
+import {
+  CreateInvoiceCommand,
+  MarkInvoiceCopayPaidCommand,
+  StampInvoiceNHIACommand,
+  UpdateInvoicePaymentStatusCommand
+} from './cqrs/invoices.commands';
 import { InvoicesReplayService } from './projection/invoices-replay.service';
 
 @ApiTags('Invoices')
@@ -37,8 +42,21 @@ export class InvoicesController {
     @Query('paidByRole') paidByRole?: string,
     @Query('paidFrom') paidFrom?: string,
     @Query('paidTo') paidTo?: string,
+    @Query('billingRoute') billingRoute?: BillingRoute,
+    @Query('nhiaStampStatus') nhiaStampStatus?: NHIAStampStatus,
+    @Query('copayStatus') copayStatus?: CopayStatus,
   ) {
-    return this.invoicesService.findAll({ createdByRole, createdByUserId, paymentStatus, paidByRole, paidFrom, paidTo });
+    return this.invoicesService.findAll({
+      createdByRole,
+      createdByUserId,
+      paymentStatus,
+      paidByRole,
+      paidFrom,
+      paidTo,
+      billingRoute,
+      nhiaStampStatus,
+      copayStatus
+    });
   }
 
   @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'pharmacy' as Role, 'staff' as Role, 'recording' as Role)
@@ -94,6 +112,28 @@ export class InvoicesController {
     const userId = req?.user?.sub as string;
     const roles: string[] = (req?.user?.roles || []) as string[];
     return this.commandBus.execute(new UpdateInvoicePaymentStatusCommand(id, body.paymentStatus, { userId, roles }));
+  }
+
+  @Roles('super_admin' as Role, 'admin' as Role, 'staff' as Role)
+  @Patch(':id/nhia/stamp')
+  async stampNHIA(
+    @Req() req: any,
+    @Param('id') id: string,
+  ) {
+    const userId = req?.user?.sub as string;
+    const roles: string[] = (req?.user?.roles || []) as string[];
+    return this.commandBus.execute(new StampInvoiceNHIACommand(id, { userId, roles }));
+  }
+
+  @Roles('super_admin' as Role, 'admin' as Role, 'staff' as Role, 'paypoint' as Role)
+  @Patch(':id/nhia/copay-paid')
+  async markCopayPaid(
+    @Req() req: any,
+    @Param('id') id: string,
+  ) {
+    const userId = req?.user?.sub as string;
+    const roles: string[] = (req?.user?.roles || []) as string[];
+    return this.commandBus.execute(new MarkInvoiceCopayPaidCommand(id, { userId, roles }));
   }
 
   @Roles('super_admin' as Role)

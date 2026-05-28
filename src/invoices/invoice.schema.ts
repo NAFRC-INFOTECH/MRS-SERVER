@@ -7,9 +7,33 @@ export enum PaymentStatus {
   CANCELED = 'canceled',
 }
 
+export enum BillingRoute {
+  PAYPOINT = 'paypoint',
+  NHIA = 'nhia',
+}
+
+export enum NHIAStampStatus {
+  AWAITING = 'awaiting',
+  STAMPED = 'stamped',
+}
+
+export enum CopayStatus {
+  AWAITING = 'awaiting',
+  PAID = 'paid',
+}
+
 export type InvoiceDocument = Invoice & Document;
 
 class InvoiceDrugItem {
+  @Prop({ trim: true, default: '' })
+  priceItemId?: string;
+
+  @Prop({ trim: true, default: '' })
+  category?: string;
+
+  @Prop({ trim: true, default: '' })
+  unit?: string;
+
   @Prop({ trim: true, required: true })
   name: string;
 
@@ -86,6 +110,51 @@ export class Invoice {
 
   @Prop({ required: true, min: 0 })
   totalCost: number;
+
+  @Prop({ type: String, enum: BillingRoute, default: BillingRoute.PAYPOINT })
+  billingRoute: BillingRoute;
+
+  @Prop({ default: false })
+  patientIsPersonnel?: boolean;
+
+  @Prop({ default: false })
+  patientHasNHIAAccess?: boolean;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  patientCopayPercent: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  patientCopayAmount: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  patientAmountDue: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  nhiaAmountDue: number;
+
+  @Prop({ type: String, enum: CopayStatus, default: CopayStatus.AWAITING })
+  copayStatus: CopayStatus;
+
+  @Prop({ required: false })
+  copayPaidAt?: Date;
+
+  @Prop({ trim: true, default: '' })
+  copayPaidByRole?: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  copayPaidByUserId?: Types.ObjectId;
+
+  @Prop({ type: String, enum: NHIAStampStatus, default: NHIAStampStatus.AWAITING })
+  nhiaStampStatus: NHIAStampStatus;
+
+  @Prop({ required: false })
+  nhiaStampedAt?: Date;
+
+  @Prop({ trim: true, default: '' })
+  nhiaStampedByRole?: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  nhiaStampedByUserId?: Types.ObjectId;
 
   @Prop({
     type: String,
