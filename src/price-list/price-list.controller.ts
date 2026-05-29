@@ -128,6 +128,18 @@ export class PriceListController {
     return this.priceListService.recordDispense(id, body.quantity);
   }
 
+  @Patch(':id/bed/occupy')
+  @Roles('super_admin' as Role, 'admin' as Role, 'recording' as Role, 'doctor' as Role)
+  async occupyBed(@Param('id') id: string, @Body() body: { quantity: number }) {
+    return this.priceListService.occupyBed(id, body.quantity);
+  }
+
+  @Patch(':id/bed/release')
+  @Roles('super_admin' as Role, 'admin' as Role, 'recording' as Role, 'doctor' as Role)
+  async releaseBed(@Param('id') id: string, @Body() body: { quantity: number }) {
+    return this.priceListService.releaseBed(id, body.quantity);
+  }
+
   @Delete(':id')
   @Roles('super_admin', 'admin')
   async remove(@Param('id') id: string) {

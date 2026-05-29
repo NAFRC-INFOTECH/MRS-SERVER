@@ -1,7 +1,12 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { EventStoreService } from '../../events/event-store.service';
 import { InvoicesService } from '../invoices.service';
-import { CreateInvoiceCommand, UpdateInvoicePaymentStatusCommand } from './invoices.commands';
+import {
+  CreateInvoiceCommand,
+  MarkInvoiceCopayPaidCommand,
+  StampInvoiceNHIACommand,
+  UpdateInvoicePaymentStatusCommand
+} from './invoices.commands';
 
 @CommandHandler(CreateInvoiceCommand)
 export class CreateInvoiceHandler implements ICommandHandler<CreateInvoiceCommand> {
@@ -63,4 +68,55 @@ export class UpdateInvoicePaymentStatusHandler implements ICommandHandler<Update
   }
 }
 
-export const InvoiceCommandHandlers = [CreateInvoiceHandler, UpdateInvoicePaymentStatusHandler];
+@CommandHandler(StampInvoiceNHIACommand)
+export class StampInvoiceNHIAHandler implements ICommandHandler<StampInvoiceNHIACommand> {
+  constructor(
+    private readonly invoicesService: InvoicesService,
+    private readonly eventStore: EventStoreService
+  ) {}
+
+  async execute(command: StampInvoiceNHIACommand) {
+    const res: any = await this.invoicesService.stampNHIA(command.id, { userId: command.meta?.userId, roles: command.meta?.roles });
+    await this.eventStore.append({
+      aggregateType: 'Invoice',
+      aggregateId: String(command.id),
+      eventType: 'InvoiceNHIAStamped',
+      payload: { invoice: res },
+      meta: {
+        actorUserId: command.meta?.userId,
+        actorRoles: command.meta?.roles
+      }
+    });
+    return res;
+  }
+}
+
+@CommandHandler(MarkInvoiceCopayPaidCommand)
+export class MarkInvoiceCopayPaidHandler implements ICommandHandler<MarkInvoiceCopayPaidCommand> {
+  constructor(
+    private readonly invoicesService: InvoicesService,
+    private readonly eventStore: EventStoreService
+  ) {}
+
+  async execute(command: MarkInvoiceCopayPaidCommand) {
+    const res: any = await this.invoicesService.markCopayPaid(command.id, { userId: command.meta?.userId, roles: command.meta?.roles });
+    await this.eventStore.append({
+      aggregateType: 'Invoice',
+      aggregateId: String(command.id),
+      eventType: 'InvoiceNHIACopayPaid',
+      payload: { invoice: res },
+      meta: {
+        actorUserId: command.meta?.userId,
+        actorRoles: command.meta?.roles
+      }
+    });
+    return res;
+  }
+}
+
+export const InvoiceCommandHandlers = [
+  CreateInvoiceHandler,
+  UpdateInvoicePaymentStatusHandler,
+  StampInvoiceNHIAHandler,
+  MarkInvoiceCopayPaidHandler
+];

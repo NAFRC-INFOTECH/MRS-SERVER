@@ -1,18 +1,22 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Patient, PatientDocument } from './patient.schema';
 import { PharmacyPatient, PharmacyPatientDocument } from './pharmacy-patient.schema';
 import { GopdQueueService } from '../gopd/gopd-queue.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { InvoicesService } from '../invoices/invoices.service';
+import { WardAdmission, WardAdmissionDocument, WardAdmissionStatus } from '../wards/ward-admission.schema';
 
 @Injectable()
 export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private readonly model: Model<PatientDocument>,
     @InjectModel(PharmacyPatient.name) private readonly pharmacyModel: Model<PharmacyPatientDocument>,
+    @InjectModel(WardAdmission.name) private readonly wardAdmissions: Model<WardAdmissionDocument>,
     private readonly gopdQueue: GopdQueueService,
     private readonly rt: RealtimeGateway,
+    private readonly invoices: InvoicesService,
   ) {}
 
   async list(search?: string): Promise<PatientDocument[]> {
@@ -181,7 +185,66 @@ export class PatientsService {
       });
     }
 
-    return this.pharmacyModel.aggregate(pipeline);
+    const base = await this.pharmacyModel.aggregate(pipeline);
+    const patientIds = Array.from(new Set((base as any[]).map((x) => String(x?._id || '')).filter(Boolean)));
+    const invoiceByPatientId = new Map<string, any>();
+    await Promise.all(
+      patientIds.map(async (pid) => {
+        const inv = await this.invoices.findLatestByPatientId(pid);
+        if (inv) invoiceByPatientId.set(pid, inv);
+      })
+    );
+
+    const admissions = await this.wardAdmissions
+      .find({ patientId: { $in: patientIds.map((id) => new Types.ObjectId(id)) }, status: WardAdmissionStatus.ADMITTED })
+      .lean();
+    const admissionByPatientId = new Map<string, any>();
+    for (const a of admissions as any[]) admissionByPatientId.set(String(a.patientId), a);
+
+    return (base as any[]).map((p) => {
+      const pid = String(p?._id || '');
+      const inv = invoiceByPatientId.get(pid) || null;
+      const admission = admissionByPatientId.get(pid) || null;
+
+      const route = String(inv?.billingRoute || '');
+      const paymentStatus = String(inv?.paymentStatus || '');
+      const nhiaStampStatus = String(inv?.nhiaStampStatus || '');
+      const copayStatus = String(inv?.copayStatus || '');
+      const patientAmountDue = Number(inv?.patientAmountDue ?? 0) || 0;
+
+      const cleared =
+        !inv
+          ? false
+          : route === 'paypoint'
+            ? paymentStatus === 'paid'
+            : nhiaStampStatus === 'stamped' && (patientAmountDue <= 0 || copayStatus === 'paid');
+
+      const hasBed = (() => {
+        const drugs = Array.isArray(p?.drugs) ? (p.drugs as any[]) : [];
+        return drugs.some((d) => String(d?.dosage || '').toLowerCase() === 'bed fee' || String(d?.category || '').toLowerCase() === 'bed');
+      })();
+
+      return {
+        ...p,
+        pharmacy: {
+          deskState: p?.deskState,
+          cleared,
+          hasInvoice: !!inv,
+          invoiceId: inv?._id ? String(inv._id) : '',
+          billingRoute: route,
+          paymentStatus,
+          nhiaStampStatus,
+          copayStatus,
+          patientAmountDue,
+          nhiaAmountDue: Number(inv?.nhiaAmountDue ?? 0) || 0,
+          totalCost: Number(inv?.totalCost ?? 0) || 0,
+          hasBed,
+          admitted: !!admission,
+          admittedWardUnit: admission ? String(admission.wardUnit || '') : '',
+          admissionId: admission ? String(admission._id || '') : '',
+        },
+      };
+    });
   }
 
   async addToPharmacy(patientId: string, data?: { prescription?: string; drugs?: any[] }): Promise<PharmacyPatientDocument> {
@@ -200,9 +263,36 @@ export class PatientsService {
 
   async updatePharmacyDeskState(patientId: string, deskState: string, data?: { prescription?: string; drugs?: any[] }): Promise<PharmacyPatientDocument> {
     const id = new Types.ObjectId(patientId);
+    const before = await this.pharmacyModel.findOne({ patientId: id }).lean();
     const update: any = { deskState };
     if (data?.prescription !== undefined) update.prescription = data.prescription;
     if (data?.drugs !== undefined) update.drugs = data.drugs;
+
+    const nextDrugs = Array.isArray(data?.drugs) ? data?.drugs : undefined;
+    const beforeDrugs = Array.isArray((before as any)?.drugs) ? (before as any).drugs : [];
+    const isDispensingAttempt = (() => {
+      if (!nextDrugs) return deskState === 'completed';
+      const beforeMap = new Map<string, boolean>();
+      for (const d of beforeDrugs) {
+        const key = String(d?.priceItemId || d?.name || '');
+        beforeMap.set(key, !!d?.dispensed);
+      }
+      for (const d of nextDrugs) {
+        const key = String(d?.priceItemId || d?.name || '');
+        const prev = beforeMap.get(key) || false;
+        const next = !!d?.dispensed;
+        if (!prev && next) return true;
+      }
+      return deskState === 'completed';
+    })();
+
+    if (isDispensingAttempt) {
+      const clearance = await this.invoices.isInvoiceClearedForPharmacy(patientId);
+      if (!clearance.ok) {
+        throw new BadRequestException(String(clearance.reason || 'Invoice not cleared'));
+      }
+    }
+
     const doc = await this.pharmacyModel.findOneAndUpdate(
       { patientId: id },
       update,

@@ -20,5 +20,6 @@ import { InvoicesReplayService } from './projection/invoices-replay.service';
   ],
   controllers: [InvoicesController],
   providers: [InvoicesService, ...InvoiceCommandHandlers, InvoicesReplayService],
+  exports: [InvoicesService],
 })
 export class InvoicesModule {}

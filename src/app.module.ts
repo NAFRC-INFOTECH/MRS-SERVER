@@ -31,6 +31,7 @@ import { InvoicesModule } from './invoices/invoices.module';
 import { HealthModule } from './health/health.module';
 import { EventsModule } from './events/events.module';
 import { ClinicalModule } from './clinical/clinical.module';
+import { WardsModule } from './wards/wards.module';
 
 // import { AdminModule } from './admin/admin.module';
 
@@ -120,6 +121,7 @@ import { ClinicalModule } from './clinical/clinical.module';
     StaffModule,
     PriceListModule,
     InvoicesModule,
+    WardsModule,
     ClinicalModule,
     HealthModule,
     EventsModule

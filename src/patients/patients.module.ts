@@ -8,6 +8,8 @@ import { PatientsController } from './patients.controller';
 import { GopdModule } from '../gopd/gopd.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { EventsModule } from '../events/events.module';
+import { InvoicesModule } from '../invoices/invoices.module';
+import { WardAdmission, WardAdmissionSchema } from '../wards/ward-admission.schema';
 import { PatientCommandHandlers } from './cqrs/patients.handlers';
 import { PatientsReplayService } from './projection/patients-replay.service';
 
@@ -16,9 +18,11 @@ import { PatientsReplayService } from './projection/patients-replay.service';
     MongooseModule.forFeature([
       { name: Patient.name, schema: PatientSchema },
       { name: PharmacyPatient.name, schema: PharmacyPatientSchema },
+      { name: WardAdmission.name, schema: WardAdmissionSchema },
     ]),
     CqrsModule,
     EventsModule,
+    InvoicesModule,
     GopdModule,
     RealtimeModule,
   ],

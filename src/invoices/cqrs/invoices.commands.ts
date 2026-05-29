@@ -20,3 +20,16 @@ export class UpdateInvoicePaymentStatusCommand {
   ) {}
 }
 
+export class StampInvoiceNHIACommand {
+  constructor(
+    public readonly id: string,
+    public readonly meta?: ActorMeta
+  ) {}
+}
+
+export class MarkInvoiceCopayPaidCommand {
+  constructor(
+    public readonly id: string,
+    public readonly meta?: ActorMeta
+  ) {}
+}
