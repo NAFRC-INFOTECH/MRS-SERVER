@@ -21,6 +21,7 @@ export class LabReferralsController {
     return this.svc.create({
       senderId,
       patientId: body.patientId,
+      invoiceId: body.invoiceId,
       date: body.date,
       serviceNoOrUUID: body.serviceNoOrUUID,
       rank: body.rank,

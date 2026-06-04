@@ -18,6 +18,9 @@ export class XrayReferral {
   @Prop({ type: MSchema.Types.ObjectId, ref: 'User', required: true })
   senderId: string;
 
+  @Prop({ type: MSchema.Types.ObjectId, ref: 'Invoice' })
+  invoiceId?: string;
+
   @Prop({ type: Date, required: true })
   date: Date;
 
@@ -72,4 +75,3 @@ export class XrayReferral {
 
 export const XrayReferralSchema = SchemaFactory.createForClass(XrayReferral);
 XrayReferralSchema.index({ patientId: 1, date: 1 }, { unique: false });
-

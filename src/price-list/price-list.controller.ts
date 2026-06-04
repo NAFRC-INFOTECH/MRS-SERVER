@@ -73,6 +73,7 @@ export class PriceListController {
         totalDrugsInStock: 0,
         totalDrugsSold: 0,
         totalDrugsSoldValue: 0,
+        nhiaClearedValue: 0,
       };
 
       if (period) return { ...fallback, period };
@@ -103,6 +104,27 @@ export class PriceListController {
       limit: limit ? Number(limit) : undefined,
       activeOnly: activeOnly === 'true',
     });
+  }
+
+  @Post('clone-month')
+  @Roles('super_admin', 'admin')
+  async cloneMonth(
+    @Body()
+    body: {
+      fromMonth: string;
+      toMonth: string;
+      overwrite?: boolean;
+      resetSoldQuantity?: boolean;
+      resetStockQuantity?: boolean;
+    },
+  ) {
+    try {
+      return await this.priceListService.cloneMonth(body);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to clone month';
+      this.logger.error(`cloneMonth endpoint failed: ${message}`, error);
+      throw new BadRequestException(message);
+    }
   }
 
   @Get(':id')

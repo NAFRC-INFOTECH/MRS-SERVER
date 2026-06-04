@@ -31,6 +31,14 @@ export class InvoicesReplayService {
         const invoice = (e.payload || {}).invoice;
         if (!invoice?._id) continue;
         await this.invoiceModel.updateOne({ _id: invoice._id }, { $set: invoice }, { upsert: true });
+      } else if (e.eventType === 'InvoiceItemsUpdated') {
+        const invoice = (e.payload || {}).invoice;
+        if (!invoice?._id) continue;
+        await this.invoiceModel.updateOne({ _id: invoice._id }, { $set: invoice }, { upsert: true });
+      } else if (e.eventType === 'InvoiceCanceled') {
+        const invoice = (e.payload || {}).invoice;
+        if (!invoice?._id) continue;
+        await this.invoiceModel.updateOne({ _id: invoice._id }, { $set: invoice }, { upsert: true });
       }
     }
     return { ok: true };

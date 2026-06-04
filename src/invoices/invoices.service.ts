@@ -56,7 +56,7 @@ export class InvoicesService {
 
   async create(
     patientId: string,
-    payload: { drugs?: any[]; items?: any[] },
+    payload: { drugs?: any[]; items?: any[]; preferredBillingRoute?: BillingRoute },
     meta?: { createdByUserId?: string; roles?: string[] },
   ): Promise<InvoiceDocument> {
     const id = new Types.ObjectId(patientId);
@@ -107,7 +107,12 @@ export class InvoicesService {
 
     const patientIsPersonnel = !!(patient as any).veteran;
     const patientHasNHIAAccess = this.isNHIAAccess(patient);
-    const billingRoute: BillingRoute = patientIsPersonnel || patientHasNHIAAccess ? BillingRoute.NHIA : BillingRoute.PAYPOINT;
+    const defaultRoute: BillingRoute = patientIsPersonnel || patientHasNHIAAccess ? BillingRoute.NHIA : BillingRoute.PAYPOINT;
+    const preferred = String(payload.preferredBillingRoute || '').trim().toLowerCase();
+    const billingRoute: BillingRoute =
+      preferred === BillingRoute.PAYPOINT ? BillingRoute.PAYPOINT
+        : preferred === BillingRoute.NHIA ? BillingRoute.NHIA
+          : defaultRoute;
 
     const patientCopayPercent = billingRoute === BillingRoute.NHIA ? (patientIsPersonnel ? 0 : 10) : 100;
     const patientCopayAmount = Math.round((totalCost * patientCopayPercent) / 100);
@@ -237,6 +242,11 @@ export class InvoicesService {
     if (String((before as any).billingRoute || '') !== BillingRoute.NHIA) {
       throw new BadRequestException('Invoice is not routed to NHIA');
     }
+    const due = Number((before as any).patientAmountDue || 0);
+    const copayStatus = String((before as any).copayStatus || '');
+    if (due > 0 && copayStatus !== CopayStatus.PAID) {
+      throw new BadRequestException('Awaiting 10% payment confirmation from paypoint');
+    }
     const role = this.pickRole(meta?.roles, ['staff', 'admin', 'super_admin']);
     before.nhiaStampStatus = NHIAStampStatus.STAMPED;
     before.nhiaStampedAt = new Date();
@@ -287,10 +297,145 @@ export class InvoicesService {
     return saved;
   }
 
+  async updateItems(id: string, items: any[], meta?: { userId?: string; roles?: string[] }) {
+    const doc = await this.invoiceModel.findById(id);
+    if (!doc) throw new NotFoundException('Invoice not found');
+    if (doc.paymentStatus === PaymentStatus.CANCELED) {
+      throw new BadRequestException('Invoice is canceled');
+    }
+
+    const route = String((doc as any).billingRoute || '');
+    if (route === BillingRoute.PAYPOINT && doc.paymentStatus === PaymentStatus.PAID) {
+      throw new BadRequestException('Paid invoices cannot be modified');
+    }
+    if (route === BillingRoute.NHIA && String((doc as any).nhiaStampStatus || '') === NHIAStampStatus.STAMPED) {
+      throw new BadRequestException('Stamped NHIA invoices cannot be modified');
+    }
+
+    const safeItems = Array.isArray(items) ? items : [];
+    const invoiceItems = safeItems.map((item) => ({
+      priceItemId: item.priceItemId,
+      category: item.category,
+      unit: item.unit,
+      name: item.name,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice || 0,
+      totalPrice: (item.unitPrice || 0) * item.quantity,
+    }));
+
+    const invoiceDrugs = Array.isArray((doc as any).drugs) ? (doc as any).drugs : [];
+    const drugsTotal = invoiceDrugs.reduce((sum: number, d: any) => sum + (Number(d.totalPrice || 0) || 0), 0);
+    const itemsTotal = invoiceItems.reduce((sum, d) => sum + (Number(d.totalPrice || 0) || 0), 0);
+    const totalCost = drugsTotal + itemsTotal;
+
+    const patientIsPersonnel = !!(doc as any).patientIsPersonnel;
+    const patientHasNHIAAccess = !!(doc as any).patientHasNHIAAccess;
+
+    if (route === BillingRoute.NHIA && !patientIsPersonnel && !patientHasNHIAAccess) {
+      throw new BadRequestException('Patient has no NHIA access');
+    }
+
+    const patientCopayPercent = route === BillingRoute.NHIA ? (patientIsPersonnel ? 0 : 10) : 100;
+    const patientCopayAmount = Math.round((totalCost * patientCopayPercent) / 100);
+    const patientAmountDue = route === BillingRoute.NHIA ? patientCopayAmount : totalCost;
+    const nhiaAmountDue = route === BillingRoute.NHIA ? Math.max(0, totalCost - patientCopayAmount) : 0;
+
+    doc.items = invoiceItems as any;
+    doc.totalCost = totalCost;
+    (doc as any).patientCopayPercent = patientCopayPercent;
+    (doc as any).patientCopayAmount = patientCopayAmount;
+    (doc as any).patientAmountDue = patientAmountDue;
+    (doc as any).nhiaAmountDue = nhiaAmountDue;
+
+    if (route === BillingRoute.NHIA) {
+      if (patientAmountDue <= 0) {
+        (doc as any).copayStatus = CopayStatus.PAID;
+        (doc as any).copayPaidAt = undefined;
+        (doc as any).copayPaidByRole = '';
+        (doc as any).copayPaidByUserId = undefined;
+      } else {
+        (doc as any).copayStatus = CopayStatus.AWAITING;
+        (doc as any).copayPaidAt = undefined;
+        (doc as any).copayPaidByRole = '';
+        (doc as any).copayPaidByUserId = undefined;
+      }
+    }
+
+    const saved = await doc.save();
+    this.rt.emit('invoice.updated', {
+      id: String(saved._id),
+      patientId: String(saved.patientId),
+      paymentStatus: saved.paymentStatus,
+      totalCost: saved.totalCost,
+      billingRoute: (saved as any).billingRoute,
+    });
+    return saved;
+  }
+
+  async cancelInvoice(id: string, meta?: { userId?: string; roles?: string[] }) {
+    const doc = await this.invoiceModel.findById(id);
+    if (!doc) throw new NotFoundException('Invoice not found');
+    if (doc.paymentStatus === PaymentStatus.CANCELED) return doc;
+
+    const route = String((doc as any).billingRoute || '');
+    if (route === BillingRoute.PAYPOINT && doc.paymentStatus === PaymentStatus.PAID) {
+      throw new BadRequestException('Paid invoices cannot be canceled');
+    }
+    if (route === BillingRoute.NHIA && String((doc as any).nhiaStampStatus || '') === NHIAStampStatus.STAMPED) {
+      throw new BadRequestException('Stamped NHIA invoices cannot be canceled');
+    }
+
+    doc.paymentStatus = PaymentStatus.CANCELED;
+    (doc as any).paidAt = undefined;
+    (doc as any).paidByRole = '';
+    (doc as any).paidByUserId = undefined;
+
+    doc.items = [] as any;
+    doc.drugs = [] as any;
+    doc.totalCost = 0;
+    (doc as any).patientCopayPercent = 0;
+    (doc as any).patientCopayAmount = 0;
+    (doc as any).patientAmountDue = 0;
+    (doc as any).nhiaAmountDue = 0;
+    (doc as any).copayStatus = CopayStatus.PAID;
+    (doc as any).copayPaidAt = undefined;
+    (doc as any).copayPaidByRole = '';
+    (doc as any).copayPaidByUserId = undefined;
+    (doc as any).nhiaStampStatus = NHIAStampStatus.AWAITING;
+    (doc as any).nhiaStampedAt = undefined;
+    (doc as any).nhiaStampedByRole = '';
+    (doc as any).nhiaStampedByUserId = undefined;
+
+    const saved = await doc.save();
+    this.rt.emit('invoice.updated', {
+      id: String(saved._id),
+      patientId: String(saved.patientId),
+      paymentStatus: saved.paymentStatus,
+      totalCost: saved.totalCost,
+      billingRoute: (saved as any).billingRoute,
+    });
+
+    await this.patientModel.findByIdAndUpdate(
+      saved.patientId,
+      { patientStatus: 'ok', patientQueue: '' },
+      { new: false },
+    );
+    this.rt.emit('patient.updated', {
+      id: String(saved.patientId),
+      patientStatus: 'ok',
+      patientQueue: '',
+    });
+
+    return saved;
+  }
+
   async isInvoiceClearedForPharmacy(patientId: string) {
     const pid = new Types.ObjectId(patientId);
     const inv = await this.invoiceModel.findOne({ patientId: pid }).sort({ createdAt: -1 }).lean();
     if (!inv) return { ok: false, reason: 'No invoice found' };
+    if (String((inv as any).paymentStatus || '') === PaymentStatus.CANCELED) {
+      return { ok: false, reason: 'Invoice canceled', invoice: inv };
+    }
 
     const route = String((inv as any).billingRoute || '');
     if (route === BillingRoute.PAYPOINT) {
