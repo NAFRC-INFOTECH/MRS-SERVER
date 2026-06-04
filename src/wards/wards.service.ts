@@ -194,4 +194,36 @@ export class WardsService {
     this.rt.emit('wardAdmission.updated', { id: String(saved._id), patientId: String(saved.patientId), wardUnit: saved.wardUnit });
     return saved.toObject();
   }
+
+  async updateMedicationOrders(
+    admissionId: string,
+    payload: { pharmacyPrescription?: string; medicationOrders?: WardMedicationOrder[] },
+    meta?: { userId?: string; roles?: string[] }
+  ) {
+    const doc = await this.admissions.findById(admissionId);
+    if (!doc) throw new NotFoundException('Ward admission not found');
+    if (doc.status !== WardAdmissionStatus.ADMITTED) throw new BadRequestException('Patient is not currently admitted');
+
+    const pharmacyPrescription = payload.pharmacyPrescription !== undefined
+      ? String(payload.pharmacyPrescription || '').trim()
+      : String(doc.pharmacyPrescription || '').trim();
+
+    const medicationOrders = (Array.isArray(payload.medicationOrders) ? payload.medicationOrders : [])
+      .map((o: any) => ({
+        priceItemId: String(o?.priceItemId || '').trim(),
+        name: String(o?.name || '').trim(),
+        quantity: Number(o?.quantity ?? 0) || 0,
+        instructions: String(o?.instructions || '').trim(),
+        usage: String(o?.usage || '').trim(),
+      }))
+      .filter((o) => !!o.priceItemId && !!o.name && Number(o.quantity) > 0);
+
+    doc.pharmacyPrescription = pharmacyPrescription;
+    doc.medicationOrders = medicationOrders as any;
+
+    const saved = await doc.save();
+    const role = this.pickRole(meta?.roles, ['staff', 'pharmacy', 'doctor', 'recording', 'admin', 'super_admin']);
+    this.rt.emit('wardAdmission.updated', { id: String(saved._id), patientId: String(saved.patientId), wardUnit: saved.wardUnit, updatedByRole: role });
+    return saved.toObject();
+  }
 }

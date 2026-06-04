@@ -58,4 +58,15 @@ export class WardsController {
     const meta = { userId: req?.user?.sub as string, roles: (req?.user?.roles || []) as string[] };
     return this.svc.administerMedication(id, body, meta);
   }
+
+  @Roles('super_admin' as Role, 'admin' as Role, 'pharmacy' as Role, 'recording' as Role, 'staff' as Role, 'doctor' as Role)
+  @Patch('admissions/:id/medications')
+  async updateMedications(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { pharmacyPrescription?: string; medicationOrders?: WardMedicationOrder[] },
+  ) {
+    const meta = { userId: req?.user?.sub as string, roles: (req?.user?.roles || []) as string[] };
+    return this.svc.updateMedicationOrders(id, body, meta);
+  }
 }

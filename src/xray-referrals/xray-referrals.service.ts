@@ -2,10 +2,12 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { XrayReferral, XrayReferralDocument, XrayReferralStatus } from './xray-referral.schema';
+import { BillingRoute, CopayStatus, Invoice, InvoiceDocument, NHIAStampStatus, PaymentStatus } from '../invoices/invoice.schema';
 
 type CreateReferralDto = {
   patientId: string;
   senderId: string;
+  invoiceId?: string;
   date: string;
   serviceNoOrUUID?: string;
   rank?: string;
@@ -29,7 +31,10 @@ type XrayTestResultsDto = {
 
 @Injectable()
 export class XrayReferralsService {
-  constructor(@InjectModel(XrayReferral.name) private readonly model: Model<XrayReferralDocument>) {}
+  constructor(
+    @InjectModel(XrayReferral.name) private readonly model: Model<XrayReferralDocument>,
+    @InjectModel(Invoice.name) private readonly invoiceModel: Model<InvoiceDocument>,
+  ) {}
 
   async create(dto: CreateReferralDto): Promise<XrayReferralDocument> {
     const date = new Date(dto.date || new Date().toISOString());
@@ -37,6 +42,7 @@ export class XrayReferralsService {
     const doc = new this.model({
       patientId: dto.patientId,
       senderId: dto.senderId,
+      invoiceId: dto.invoiceId,
       date,
       serviceNoOrUUID: dto.serviceNoOrUUID,
       rank: dto.rank,
@@ -100,6 +106,7 @@ export class XrayReferralsService {
     const list = await this.model
       .find(q)
       .populate('senderId', 'name email')
+      .populate('invoiceId', 'billingRoute paymentStatus nhiaStampStatus copayStatus patientAmountDue')
       .sort({ createdAt: -1 })
       .lean();
     return list.map((r: any) => this.mapReferral(r));
@@ -107,6 +114,15 @@ export class XrayReferralsService {
 
   async setStatus(id: string, status: XrayReferralStatus): Promise<any> {
     if (!Object.values(XrayReferralStatus).includes(status)) throw new BadRequestException('Invalid status');
+    if (status === XrayReferralStatus.RECEIVED || status === XrayReferralStatus.COMPLETED) {
+      const ref = await this.model.findById(id).lean();
+      if (!ref) throw new BadRequestException('Referral not found');
+      const invoiceId = String((ref as any).invoiceId || '').trim();
+      if (!invoiceId) throw new BadRequestException('Invoice not found for referral');
+      const inv = await this.invoiceModel.findById(invoiceId).lean();
+      const clearance = this.computeClearance(inv);
+      if (!clearance.isCleared) throw new BadRequestException('Patient has not been cleared for this request');
+    }
     const saved = await this.model.findByIdAndUpdate(id, { status }, { new: true }).lean();
     if (!saved) throw new BadRequestException('Referral not found');
     return { id: String(saved._id), status: saved.status };
@@ -132,12 +148,22 @@ export class XrayReferralsService {
 
   private mapReferral(r: any) {
     const senderObj = typeof r.senderId === 'object' && r.senderId !== null ? r.senderId : null;
+    const invoiceObj = typeof r.invoiceId === 'object' && r.invoiceId !== null ? r.invoiceId : null;
+    const clearance = this.computeClearance(invoiceObj);
     return {
       id: String(r._id),
       patientId: String(r.patientId),
       senderId: String(senderObj?._id || r.senderId),
       senderName: senderObj?.name,
       senderEmail: senderObj?.email,
+      invoiceId: invoiceObj?._id ? String(invoiceObj._id) : (r.invoiceId ? String(r.invoiceId) : undefined),
+      billingRoute: invoiceObj?.billingRoute,
+      paymentStatus: invoiceObj?.paymentStatus,
+      nhiaStampStatus: invoiceObj?.nhiaStampStatus,
+      copayStatus: invoiceObj?.copayStatus,
+      patientAmountDue: invoiceObj?.patientAmountDue,
+      isCleared: clearance.isCleared,
+      clearanceLabel: clearance.label,
       date: r.date,
       serviceNoOrUUID: r.serviceNoOrUUID,
       rank: r.rank,
@@ -159,5 +185,23 @@ export class XrayReferralsService {
       updatedAt: r.updatedAt,
     };
   }
-}
 
+  private computeClearance(inv: any | null | undefined): { isCleared: boolean; label: string } {
+    if (!inv) return { isCleared: false, label: 'No Invoice' };
+    const route = String(inv.billingRoute || '').toLowerCase();
+    if (route === BillingRoute.PAYPOINT) {
+      const paid = String(inv.paymentStatus || '') === PaymentStatus.PAID;
+      return { isCleared: paid, label: paid ? 'Paid' : 'Awaiting Payment' };
+    }
+
+    const stamped = String(inv.nhiaStampStatus || '') === NHIAStampStatus.STAMPED;
+    if (!stamped) {
+      const due = Number(inv.patientAmountDue ?? 0) || 0;
+      if (due > 0 && String(inv.copayStatus || '') !== CopayStatus.PAID) {
+        return { isCleared: false, label: 'Awaiting 10% Payment' };
+      }
+      return { isCleared: false, label: 'Awaiting NHIA Stamp' };
+    }
+    return { isCleared: true, label: 'NHIA Cleared' };
+  }
+}

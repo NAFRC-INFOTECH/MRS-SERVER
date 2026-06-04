@@ -5,6 +5,7 @@ import { PriceItem, PriceItemDocument } from './price-item.schema';
 import { PriceListSummary, PriceListSummaryDocument } from './price-list-summary.schema';
 import { CreatePriceItemDto } from './dto/create-price-item.dto';
 import { UpdatePriceItemDto } from './dto/update-price-item.dto';
+import { BillingRoute, CopayStatus, Invoice, InvoiceDocument, NHIAStampStatus } from '../invoices/invoice.schema';
 
 export type ListPriceItemsQuery = {
   q?: string;
@@ -21,6 +22,8 @@ export class PriceListService implements OnModuleInit {
     private readonly priceItemModel: Model<PriceItemDocument>,
     @InjectModel(PriceListSummary.name)
     private readonly priceListSummaryModel: Model<PriceListSummaryDocument>,
+    @InjectModel(Invoice.name)
+    private readonly invoices: Model<InvoiceDocument>,
   ) {}
 
   async onModuleInit() {
@@ -32,7 +35,9 @@ export class PriceListService implements OnModuleInit {
     const filter: any = {};
 
     if (query.category) {
-      filter.category = query.category;
+      const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const raw = String(query.category || '').trim();
+      if (raw) filter.category = { $regex: new RegExp(`^${escapeRegex(raw)}$`, 'i') };
     }
 
     if (query.activeOnly) {
@@ -65,7 +70,7 @@ export class PriceListService implements OnModuleInit {
 
     const doc = new this.priceItemModel({
       name: dto.name.trim(),
-      category: dto.category,
+      category: String(dto.category || '').trim().toLowerCase(),
       description: dto.description?.trim() || '',
       unit: dto.unit?.trim() || 'per item',
       price: dto.price,
@@ -87,7 +92,7 @@ export class PriceListService implements OnModuleInit {
     const update: any = {};
 
     if (dto.name !== undefined) update.name = dto.name.trim();
-    if (dto.category !== undefined) update.category = dto.category;
+    if (dto.category !== undefined) update.category = String(dto.category || '').trim().toLowerCase();
     if (dto.description !== undefined) update.description = dto.description.trim();
     if (dto.unit !== undefined) update.unit = dto.unit.trim() || 'per item';    
     if (dto.price !== undefined) {
@@ -153,10 +158,97 @@ export class PriceListService implements OnModuleInit {
     return { ok: true };
   }
 
+  async cloneMonth(input: {
+    fromMonth: string;
+    toMonth: string;
+    overwrite?: boolean;
+    resetSoldQuantity?: boolean;
+    resetStockQuantity?: boolean;
+  }) {
+    const fromMonth = this.normalizeMonth(input.fromMonth);
+    const toMonth = this.normalizeMonth(input.toMonth);
+    if (!fromMonth || !toMonth) throw new BadRequestException('Invalid month format. Use YYYY-MM');
+    if (fromMonth === toMonth) throw new BadRequestException('fromMonth and toMonth cannot be the same');
+
+    const fromRange = this.monthRange(fromMonth);
+    const toRange = this.monthRange(toMonth);
+
+    const source = await this.priceItemModel
+      .find({ createdAt: { $gte: fromRange.start, $lt: fromRange.end } })
+      .lean()
+      .exec();
+
+    if (!source.length) {
+      throw new BadRequestException(`No price list items found for ${fromMonth}`);
+    }
+
+    const existingTargetCount = await this.priceItemModel
+      .countDocuments({ createdAt: { $gte: toRange.start, $lt: toRange.end } })
+      .exec();
+
+    if (existingTargetCount > 0 && !input.overwrite) {
+      throw new BadRequestException(`Target month ${toMonth} already has ${existingTargetCount} items`);
+    }
+
+    let deletedCount = 0;
+    if (existingTargetCount > 0 && input.overwrite) {
+      const del = await this.priceItemModel.deleteMany({ createdAt: { $gte: toRange.start, $lt: toRange.end } }).exec();
+      deletedCount = Number((del as any).deletedCount || 0);
+    }
+
+    const resetSold = input.resetSoldQuantity ?? true;
+    const resetStock = input.resetStockQuantity ?? false;
+
+    const now = new Date();
+    const docs = source.map((it: any) => ({
+      name: String(it.name || '').trim(),
+      category: String(it.category || '').trim().toLowerCase(),
+      description: String(it.description || '').trim(),
+      unit: String(it.unit || '').trim() || 'per item',
+      price: Number(it.price) || 0,
+      isActive: !!it.isActive,
+      sortOrder: Number(it.sortOrder) || 0,
+      stockQuantity: resetStock ? 0 : Number(it.stockQuantity) || 0,
+      soldQuantity: resetSold ? 0 : Number(it.soldQuantity) || 0,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    const inserted = await this.priceItemModel.insertMany(docs, { ordered: true } as any);
+    await this.recalculateAllSummaries();
+    return {
+      ok: true,
+      fromMonth,
+      toMonth,
+      sourceCount: source.length,
+      deletedCount,
+      createdCount: inserted.length,
+    };
+  }
+
   private validatePrice(price: number) {
     if (!Number.isFinite(price) || price < 0) {
       throw new BadRequestException('Price must be a valid non-negative number');
     }
+  }
+
+  private normalizeMonth(value: string) {
+    const v = String(value || '').trim();
+    if (!/^\d{4}-\d{2}$/.test(v)) return '';
+    const [yRaw, mRaw] = v.split('-');
+    const y = Number(yRaw);
+    const m = Number(mRaw);
+    if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) return '';
+    return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}`;
+  }
+
+  private monthRange(month: string) {
+    const [yRaw, mRaw] = month.split('-');
+    const y = Number(yRaw);
+    const m = Number(mRaw);
+    const start = new Date(y, m - 1, 1, 0, 0, 0, 0);
+    const end = new Date(y, m, 1, 0, 0, 0, 0);
+    return { start, end };
   }
 
   private validateQuantity(quantity?: number) {
@@ -326,6 +418,91 @@ export class PriceListService implements OnModuleInit {
     };
   }
 
+  private normalizeReferenceDate(period: SummaryPeriod, referenceDate?: string) {
+    const raw = String(referenceDate || '').trim();
+    if (!raw) return '';
+    if (period === 'monthly') {
+      if (/^\d{4}-\d{2}$/.test(raw)) return raw;
+      if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 7);
+      const d = new Date(raw);
+      if (Number.isFinite(d.getTime())) return d.toISOString().slice(0, 7);
+      return raw.slice(0, 7);
+    }
+    if (/^\d{4}$/.test(raw)) return raw;
+    if (/^\d{4}-/.test(raw)) return raw.slice(0, 4);
+    const d = new Date(raw);
+    if (Number.isFinite(d.getTime())) return String(d.getFullYear());
+    return raw.slice(0, 4);
+  }
+
+  private getRange(period: SummaryPeriod, referenceDate: string) {
+    if (period === 'yearly') {
+      const y = Number(referenceDate.slice(0, 4));
+      const start = new Date(y, 0, 1, 0, 0, 0, 0);
+      const end = new Date(y + 1, 0, 1, 0, 0, 0, 0);
+      return { start, end };
+    }
+    const y = Number(referenceDate.slice(0, 4));
+    const m = Number(referenceDate.slice(5, 7));
+    const start = new Date(y, m - 1, 1, 0, 0, 0, 0);
+    const end = new Date(y, m, 1, 0, 0, 0, 0);
+    return { start, end };
+  }
+
+  private invoiceTotal(inv: any) {
+    const total = Number(inv?.totalCost ?? 0);
+    if (Number.isFinite(total) && total > 0) return total;
+    const drugs = Array.isArray(inv?.drugs) ? inv.drugs : [];
+    const items = Array.isArray(inv?.items) ? inv.items : [];
+    const drugsTotal = drugs.reduce((s: number, it: any) => s + (Number(it?.totalPrice) || 0), 0);
+    const itemsTotal = items.reduce((s: number, it: any) => s + (Number(it?.totalPrice) || 0), 0);
+    return drugsTotal + itemsTotal;
+  }
+
+  private invoiceNHIAPortion(inv: any) {
+    const nhiaAmountDue = Number(inv?.nhiaAmountDue ?? 0);
+    if (Number.isFinite(nhiaAmountDue) && nhiaAmountDue > 0) return nhiaAmountDue;
+    const total = this.invoiceTotal(inv);
+    const patientDue = Number(inv?.patientAmountDue ?? 0) || 0;
+    const computed = total - patientDue;
+    return computed > 0 ? computed : 0;
+  }
+
+  private async getNHIAClearedValue(period: SummaryPeriod, referenceDate: string) {
+    const { start, end } = this.getRange(period, referenceDate);
+
+    const stampedNoCopay = await this.invoices
+      .find({
+        billingRoute: BillingRoute.NHIA,
+        nhiaStampStatus: NHIAStampStatus.STAMPED,
+        patientAmountDue: { $lte: 0 },
+        $or: [
+          { nhiaStampedAt: { $gte: start, $lt: end } },
+          { nhiaStampedAt: { $exists: false }, updatedAt: { $gte: start, $lt: end } },
+        ],
+      })
+      .select({ totalCost: 1, drugs: 1, items: 1, nhiaAmountDue: 1, patientAmountDue: 1 })
+      .lean()
+      .exec();
+
+    const stampedWithCopay = await this.invoices
+      .find({
+        billingRoute: BillingRoute.NHIA,
+        nhiaStampStatus: NHIAStampStatus.STAMPED,
+        patientAmountDue: { $gt: 0 },
+        copayStatus: CopayStatus.PAID,
+        $or: [
+          { copayPaidAt: { $gte: start, $lt: end } },
+          { copayPaidAt: { $exists: false }, updatedAt: { $gte: start, $lt: end } },
+        ],
+      })
+      .select({ totalCost: 1, drugs: 1, items: 1, nhiaAmountDue: 1, patientAmountDue: 1 })
+      .lean()
+      .exec();
+
+    return [...stampedNoCopay, ...stampedWithCopay].reduce((sum, inv) => sum + this.invoiceNHIAPortion(inv), 0);
+  }
+
   private async recalculateAllSummaries() {
     try {
       const items = await this.priceItemModel.find().lean().exec();
@@ -353,13 +530,12 @@ export class PriceListService implements OnModuleInit {
   }
 
   async getSummary(period: SummaryPeriod, referenceDate?: string): Promise<any> {
-    const defaultRef = period === 'monthly' 
-      ? new Date().toISOString().slice(0, 7) 
-      : String(new Date().getFullYear());
-    const ref = referenceDate || defaultRef;
+    const defaultRef = period === 'monthly' ? new Date().toISOString().slice(0, 7) : String(new Date().getFullYear());
+    const ref = this.normalizeReferenceDate(period, referenceDate) || defaultRef;
 
     try {
       const existingSummary = await this.priceListSummaryModel.findOne({ period, referenceDate: ref }).lean();
+      const nhiaClearedValue = await this.getNHIAClearedValue(period, ref);
 
       if (existingSummary) {
         return {
@@ -371,10 +547,12 @@ export class PriceListService implements OnModuleInit {
           drugs: existingSummary.drugs,
           totalDrugs: existingSummary.totalDrugs,
           services: existingSummary.services,
+          servicesValue: existingSummary.servicesValue,
           totalValue: existingSummary.totalValue,
           totalDrugsInStock: existingSummary.totalDrugsInStock,
           totalDrugsSold: existingSummary.totalDrugsSold,
           totalDrugsSoldValue: existingSummary.totalDrugsSoldValue,
+          nhiaClearedValue,
         };
       }
 
@@ -391,10 +569,12 @@ export class PriceListService implements OnModuleInit {
         drugs: createdSummary.drugs,
         totalDrugs: createdSummary.totalDrugs,
         services: createdSummary.services,
+        servicesValue: createdSummary.servicesValue,
         totalValue: createdSummary.totalValue,
         totalDrugsInStock: createdSummary.totalDrugsInStock,
         totalDrugsSold: createdSummary.totalDrugsSold,
         totalDrugsSoldValue: createdSummary.totalDrugsSoldValue,
+        nhiaClearedValue,
       };
     } catch (error) {
       console.error('[PriceListService] getSummary error:', error);
@@ -407,10 +587,12 @@ export class PriceListService implements OnModuleInit {
         drugs: 0,
         totalDrugs: 0,
         services: 0,
+        servicesValue: 0,
         totalValue: 0,
         totalDrugsInStock: 0,
         totalDrugsSold: 0,
         totalDrugsSoldValue: 0,
+        nhiaClearedValue: 0,
       };
     }
   }

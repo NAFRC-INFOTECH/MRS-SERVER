@@ -8,9 +8,11 @@ import { CommandBus } from '@nestjs/cqrs';
 import { InvoicesService } from './invoices.service';
 import { BillingRoute, CopayStatus, NHIAStampStatus, PaymentStatus } from './invoice.schema';
 import {
+  CancelInvoiceCommand,
   CreateInvoiceCommand,
   MarkInvoiceCopayPaidCommand,
   StampInvoiceNHIACommand,
+  UpdateInvoiceItemsCommand,
   UpdateInvoicePaymentStatusCommand
 } from './cqrs/invoices.commands';
 import { InvoicesReplayService } from './projection/invoices-replay.service';
@@ -32,6 +34,7 @@ export class InvoicesController {
     'paypoint' as Role,
     'doctor' as Role,
     'staff' as Role,
+    'clinical' as Role,
     'recording' as Role,
   )
   @Get()
@@ -59,9 +62,9 @@ export class InvoicesController {
     });
   }
 
-  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'pharmacy' as Role, 'staff' as Role, 'recording' as Role)
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'clinical' as Role, 'pharmacy' as Role, 'staff' as Role, 'recording' as Role)
   @Post()
-  async create(@Req() req: any, @Body() body: { patientId: string; drugs?: any[]; items?: any[] }) {
+  async create(@Req() req: any, @Body() body: { patientId: string; drugs?: any[]; items?: any[]; preferredBillingRoute?: BillingRoute }) {
     const createdByUserId = req?.user?.sub as string;
     const roles: string[] = (req?.user?.roles || []) as string[];
     return this.commandBus.execute(new CreateInvoiceCommand(body, { userId: createdByUserId, roles }));
@@ -72,6 +75,7 @@ export class InvoicesController {
     'admin' as Role,
     'paypoint' as Role,
     'doctor' as Role,
+    'clinical' as Role,
     'pharmacy' as Role,
     'staff' as Role,
     'recording' as Role,
@@ -86,6 +90,7 @@ export class InvoicesController {
     'admin' as Role,
     'paypoint' as Role,
     'doctor' as Role,
+    'clinical' as Role,
     'pharmacy' as Role,
     'staff' as Role,
     'recording' as Role,
@@ -112,6 +117,29 @@ export class InvoicesController {
     const userId = req?.user?.sub as string;
     const roles: string[] = (req?.user?.roles || []) as string[];
     return this.commandBus.execute(new UpdateInvoicePaymentStatusCommand(id, body.paymentStatus, { userId, roles }));
+  }
+
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'clinical' as Role, 'staff' as Role)
+  @Patch(':id/items')
+  async updateItems(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { items: any[] },
+  ) {
+    const userId = req?.user?.sub as string;
+    const roles: string[] = (req?.user?.roles || []) as string[];
+    return this.commandBus.execute(new UpdateInvoiceItemsCommand(id, Array.isArray(body.items) ? body.items : [], { userId, roles }));
+  }
+
+  @Roles('super_admin' as Role, 'admin' as Role, 'doctor' as Role, 'clinical' as Role, 'staff' as Role)
+  @Patch(':id/cancel')
+  async cancel(
+    @Req() req: any,
+    @Param('id') id: string,
+  ) {
+    const userId = req?.user?.sub as string;
+    const roles: string[] = (req?.user?.roles || []) as string[];
+    return this.commandBus.execute(new CancelInvoiceCommand(id, { userId, roles }));
   }
 
   @Roles('super_admin' as Role, 'admin' as Role, 'staff' as Role)

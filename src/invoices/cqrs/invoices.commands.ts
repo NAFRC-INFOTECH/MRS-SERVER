@@ -1,4 +1,4 @@
-import type { PaymentStatus } from '../invoice.schema';
+import type { BillingRoute, PaymentStatus } from '../invoice.schema';
 
 export type ActorMeta = {
   userId?: string;
@@ -7,7 +7,7 @@ export type ActorMeta = {
 
 export class CreateInvoiceCommand {
   constructor(
-    public readonly payload: { patientId: string; drugs?: any[]; items?: any[] },
+    public readonly payload: { patientId: string; drugs?: any[]; items?: any[]; preferredBillingRoute?: BillingRoute },
     public readonly meta?: ActorMeta
   ) {}
 }
@@ -28,6 +28,21 @@ export class StampInvoiceNHIACommand {
 }
 
 export class MarkInvoiceCopayPaidCommand {
+  constructor(
+    public readonly id: string,
+    public readonly meta?: ActorMeta
+  ) {}
+}
+
+export class UpdateInvoiceItemsCommand {
+  constructor(
+    public readonly id: string,
+    public readonly items: any[],
+    public readonly meta?: ActorMeta
+  ) {}
+}
+
+export class CancelInvoiceCommand {
   constructor(
     public readonly id: string,
     public readonly meta?: ActorMeta

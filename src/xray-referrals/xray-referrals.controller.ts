@@ -14,13 +14,14 @@ import { XrayReferralStatus } from './xray-referral.schema';
 export class XrayReferralsController {
   constructor(private readonly svc: XrayReferralsService) {}
 
-  @Roles('doctor' as Role)
+  @Roles('doctor' as Role, 'clinical' as Role)
   @Post()
   async create(@Req() req: any, @Body() body: any) {
     const senderId = req?.user?.userId || req?.user?.sub;
     return this.svc.create({
       senderId,
       patientId: body.patientId,
+      invoiceId: body.invoiceId,
       date: body.date,
       serviceNoOrUUID: body.serviceNoOrUUID,
       rank: body.rank,
@@ -39,7 +40,7 @@ export class XrayReferralsController {
     });
   }
 
-  @Roles('doctor' as Role, 'radiology' as Role, 'super_admin' as Role, 'admin' as Role)
+  @Roles('doctor' as Role, 'radiology' as Role, 'staff' as Role, 'super_admin' as Role, 'admin' as Role)
   @Get()
   async list(
     @Query('status') status?: XrayReferralStatus,
@@ -51,13 +52,13 @@ export class XrayReferralsController {
     return this.svc.list({ status, date, patientId, period, value });
   }
 
-  @Roles('radiology' as Role, 'super_admin' as Role)
+  @Roles('radiology' as Role, 'staff' as Role, 'super_admin' as Role)
   @Put(':id/status')
   async setStatus(@Param('id') id: string, @Body() body: { status: XrayReferralStatus }) {
     return this.svc.setStatus(id, body.status);
   }
 
-  @Roles('radiology' as Role, 'super_admin' as Role)
+  @Roles('radiology' as Role, 'staff' as Role, 'super_admin' as Role)
   @Put(':id/results')
   async updateResults(@Param('id') id: string, @Body() body: { testResults: Record<string, string> }) {
     return this.svc.updateResults(id, { testResults: body.testResults || {} });

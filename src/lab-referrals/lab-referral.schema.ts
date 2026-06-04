@@ -18,6 +18,9 @@ export class LabReferral {
   @Prop({ type: MSchema.Types.ObjectId, ref: 'User', required: true })
   senderId: string;
  
+  @Prop({ type: MSchema.Types.ObjectId, ref: 'Invoice' })
+  invoiceId?: string;
+
   @Prop({ type: Date, required: true })
   date: Date;
  

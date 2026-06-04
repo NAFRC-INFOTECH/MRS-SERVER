@@ -7,6 +7,8 @@ export enum PriceCategory {
   DRUG = 'drug',
   CONSULTATION = 'consultation',
   BED = 'bed',
+  TEST = 'test',
+  SCAN = 'scan',
   PROCEDURE = 'procedure',
   LABORATORY = 'laboratory',
   OTHER = 'other',

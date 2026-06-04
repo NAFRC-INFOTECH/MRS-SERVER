@@ -3,8 +3,10 @@ import { EventStoreService } from '../../events/event-store.service';
 import { InvoicesService } from '../invoices.service';
 import {
   CreateInvoiceCommand,
+  CancelInvoiceCommand,
   MarkInvoiceCopayPaidCommand,
   StampInvoiceNHIACommand,
+  UpdateInvoiceItemsCommand,
   UpdateInvoicePaymentStatusCommand
 } from './invoices.commands';
 
@@ -114,9 +116,63 @@ export class MarkInvoiceCopayPaidHandler implements ICommandHandler<MarkInvoiceC
   }
 }
 
+@CommandHandler(UpdateInvoiceItemsCommand)
+export class UpdateInvoiceItemsHandler implements ICommandHandler<UpdateInvoiceItemsCommand> {
+  constructor(
+    private readonly invoicesService: InvoicesService,
+    private readonly eventStore: EventStoreService
+  ) {}
+
+  async execute(command: UpdateInvoiceItemsCommand) {
+    const res: any = await this.invoicesService.updateItems(command.id, command.items, {
+      userId: command.meta?.userId,
+      roles: command.meta?.roles
+    });
+    await this.eventStore.append({
+      aggregateType: 'Invoice',
+      aggregateId: String(command.id),
+      eventType: 'InvoiceItemsUpdated',
+      payload: { invoice: res },
+      meta: {
+        actorUserId: command.meta?.userId,
+        actorRoles: command.meta?.roles
+      }
+    });
+    return res;
+  }
+}
+
+@CommandHandler(CancelInvoiceCommand)
+export class CancelInvoiceHandler implements ICommandHandler<CancelInvoiceCommand> {
+  constructor(
+    private readonly invoicesService: InvoicesService,
+    private readonly eventStore: EventStoreService
+  ) {}
+
+  async execute(command: CancelInvoiceCommand) {
+    const res: any = await this.invoicesService.cancelInvoice(command.id, {
+      userId: command.meta?.userId,
+      roles: command.meta?.roles
+    });
+    await this.eventStore.append({
+      aggregateType: 'Invoice',
+      aggregateId: String(command.id),
+      eventType: 'InvoiceCanceled',
+      payload: { invoice: res },
+      meta: {
+        actorUserId: command.meta?.userId,
+        actorRoles: command.meta?.roles
+      }
+    });
+    return res;
+  }
+}
+
 export const InvoiceCommandHandlers = [
   CreateInvoiceHandler,
   UpdateInvoicePaymentStatusHandler,
   StampInvoiceNHIAHandler,
-  MarkInvoiceCopayPaidHandler
+  MarkInvoiceCopayPaidHandler,
+  UpdateInvoiceItemsHandler,
+  CancelInvoiceHandler
 ];
